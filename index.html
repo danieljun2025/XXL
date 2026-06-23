@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>消消乐</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', sans-serif;
+      color: #fff;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      text-shadow: 0 0 20px rgba(255, 200, 0, 0.8);
+      letter-spacing: 4px;
+    }
+
+    #scoreboard {
+      display: flex;
+      gap: 40px;
+      margin-bottom: 20px;
+      font-size: 1.1rem;
+    }
+
+    #scoreboard span {
+      background: rgba(255,255,255,0.1);
+      padding: 6px 20px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    #scoreboard strong {
+      color: #ffd700;
+      font-size: 1.3rem;
+    }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(8, 60px);
+      grid-template-rows: repeat(8, 60px);
+      gap: 4px;
+      background: rgba(255,255,255,0.05);
+      padding: 10px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.15);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    .cell {
+      width: 60px;
+      height: 60px;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      transition: transform 0.1s, box-shadow 0.1s;
+      user-select: none;
+      border: 2px solid transparent;
+      position: relative;
+    }
+
+    .cell:hover { transform: scale(1.08); }
+
+    .cell.selected {
+      border-color: #fff;
+      box-shadow: 0 0 12px rgba(255,255,255,0.8);
+      transform: scale(1.12);
+      z-index: 10;
+    }
+
+    .cell.matched {
+      animation: pop 0.3s ease forwards;
+    }
+
+    .cell.fall {
+      animation: fallIn 0.25s ease;
+    }
+
+    @keyframes pop {
+      0%   { transform: scale(1); opacity: 1; }
+      50%  { transform: scale(1.3); opacity: 0.6; }
+      100% { transform: scale(0); opacity: 0; }
+    }
+
+    @keyframes fallIn {
+      from { transform: translateY(-30px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    .c0 { background: linear-gradient(145deg, #ff6b6b, #cc0000); }
+    .c1 { background: linear-gradient(145deg, #ffd93d, #f0a500); }
+    .c2 { background: linear-gradient(145deg, #6bcb77, #2d8f3c); }
+    .c3 { background: linear-gradient(145deg, #4d96ff, #1a5cb8); }
+    .c4 { background: linear-gradient(145deg, #c77dff, #7b2fff); }
+    .c5 { background: linear-gradient(145deg, #ff9a3c, #c96a00); }
+
+    #message {
+      margin-top: 16px;
+      height: 30px;
+      font-size: 1.2rem;
+      color: #ffd700;
+      text-shadow: 0 0 8px rgba(255,215,0,0.6);
+      transition: opacity 0.3s;
+    }
+
+    #controls {
+      margin-top: 16px;
+      display: flex;
+      gap: 12px;
+    }
+
+    button {
+      padding: 10px 28px;
+      border: none;
+      border-radius: 24px;
+      font-size: 1rem;
+      cursor: pointer;
+      font-weight: bold;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+
+    button:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+
+    #btnRestart {
+      background: linear-gradient(135deg, #ffd700, #ff9500);
+      color: #000;
+    }
+
+    #moves-left { color: #adf; }
+  </style>
+</head>
+<body>
+  <h1>消消乐</h1>
+
+  <div id="scoreboard">
+    <span>得分 <strong id="score">0</strong></span>
+    <span>步数 <strong id="moves">30</strong></span>
+    <span>目标 <strong id="target">500</strong></span>
+  </div>
+
+  <div id="board"></div>
+  <div id="message"></div>
+
+  <div id="controls">
+    <button id="btnRestart">重新开始</button>
+  </div>
+
+<script>
+const ROWS = 8, COLS = 8;
+const GEMS = ['🔴','🟡','🟢','🔵','🟣','🟠'];
+const COLORS = ['c0','c1','c2','c3','c4','c5'];
+const TARGET = 500;
+const MAX_MOVES = 30;
+
+let board = [], selected = null, score = 0, moves = MAX_MOVES, busy = false;
+
+const boardEl = document.getElementById('board');
+const scoreEl = document.getElementById('score');
+const movesEl = document.getElementById('moves');
+const msgEl   = document.getElementById('message');
+
+function rand() { return Math.floor(Math.random() * GEMS.length); }
+
+function initBoard() {
+  board = Array.from({length: ROWS}, () => Array.from({length: COLS}, rand));
+  // ensure no initial matches
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      while (hasMatchAt(r, c)) board[r][c] = rand();
+    }
+  }
+}
+
+function hasMatchAt(r, c) {
+  const v = board[r][c];
+  if (c >= 2 && board[r][c-1] === v && board[r][c-2] === v) return true;
+  if (r >= 2 && board[r-1][c] === v && board[r-2][c] === v) return true;
+  return false;
+}
+
+function render() {
+  boardEl.innerHTML = '';
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const cell = document.createElement('div');
+      const v = board[r][c];
+      cell.className = `cell ${COLORS[v]}`;
+      cell.textContent = GEMS[v];
+      cell.dataset.r = r;
+      cell.dataset.c = c;
+      cell.addEventListener('click', onCellClick);
+      boardEl.appendChild(cell);
+    }
+  }
+}
+
+function cellEl(r, c) {
+  return boardEl.children[r * COLS + c];
+}
+
+async function onCellClick(e) {
+  if (busy || moves <= 0) return;
+  const r = +e.currentTarget.dataset.r;
+  const c = +e.currentTarget.dataset.c;
+
+  if (!selected) {
+    selected = {r, c};
+    cellEl(r, c).classList.add('selected');
+    return;
+  }
+
+  const {r: sr, c: sc} = selected;
+  cellEl(sr, sc).classList.remove('selected');
+
+  if (sr === r && sc === c) { selected = null; return; }
+
+  const adjacent = (Math.abs(r - sr) + Math.abs(c - sc)) === 1;
+  if (!adjacent) {
+    selected = {r, c};
+    cellEl(r, c).classList.add('selected');
+    return;
+  }
+
+  selected = null;
+  busy = true;
+
+  swap(sr, sc, r, c);
+  render();
+
+  const matched = findMatches();
+  if (matched.size === 0) {
+    // revert
+    await sleep(150);
+    swap(sr, sc, r, c);
+    render();
+    busy = false;
+    return;
+  }
+
+  moves--;
+  movesEl.textContent = moves;
+  await processMatches(matched);
+  busy = false;
+
+  if (score >= TARGET) {
+    showMsg('🎉 恭喜过关！');
+  } else if (moves <= 0) {
+    showMsg('💔 游戏结束！');
+  }
+}
+
+function swap(r1, c1, r2, c2) {
+  [board[r1][c1], board[r2][c2]] = [board[r2][c2], board[r1][c1]];
+}
+
+function findMatches() {
+  const matched = new Set();
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS - 2; c++) {
+      const v = board[r][c];
+      if (v === board[r][c+1] && v === board[r][c+2]) {
+        matched.add(`${r},${c}`);
+        matched.add(`${r},${c+1}`);
+        matched.add(`${r},${c+2}`);
+      }
+    }
+  }
+  for (let c = 0; c < COLS; c++) {
+    for (let r = 0; r < ROWS - 2; r++) {
+      const v = board[r][c];
+      if (v === board[r+1][c] && v === board[r+2][c]) {
+        matched.add(`${r},${c}`);
+        matched.add(`${r+1},${c}`);
+        matched.add(`${r+2},${c}`);
+      }
+    }
+  }
+  return matched;
+}
+
+async function processMatches(matched) {
+  // animate removal
+  matched.forEach(key => {
+    const [r, c] = key.split(',').map(Number);
+    cellEl(r, c).classList.add('matched');
+  });
+  score += matched.size * 10;
+  scoreEl.textContent = score;
+  showMsg(`+${matched.size * 10}`);
+  await sleep(350);
+
+  // remove matched cells (set to -1)
+  matched.forEach(key => {
+    const [r, c] = key.split(',').map(Number);
+    board[r][c] = -1;
+  });
+
+  // drop tiles down
+  for (let c = 0; c < COLS; c++) {
+    let empty = ROWS - 1;
+    for (let r = ROWS - 1; r >= 0; r--) {
+      if (board[r][c] !== -1) {
+        board[empty][c] = board[r][c];
+        if (empty !== r) board[r][c] = -1;
+        empty--;
+      }
+    }
+    for (let r = empty; r >= 0; r--) {
+      board[r][c] = rand();
+    }
+  }
+
+  render();
+
+  // animate fall
+  document.querySelectorAll('.cell').forEach(el => el.classList.add('fall'));
+  await sleep(300);
+
+  // check for chain matches
+  const next = findMatches();
+  if (next.size > 0) {
+    await processMatches(next);
+  }
+}
+
+function showMsg(text) {
+  msgEl.textContent = text;
+  setTimeout(() => { msgEl.textContent = ''; }, 1200);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function startGame() {
+  score = 0; moves = MAX_MOVES; selected = null; busy = false;
+  scoreEl.textContent = 0;
+  movesEl.textContent = moves;
+  msgEl.textContent = '';
+  initBoard();
+  render();
+}
+
+document.getElementById('btnRestart').addEventListener('click', startGame);
+
+startGame();
+</script>
+</body>
+</html>

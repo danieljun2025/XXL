@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git fetch *)",
+      "Bash(git branch *)",
+      "Bash(git pull *)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(where node *)",
+      "Bash(where npx *)",
+      "Bash(gh auth *)",
+      "PowerShell(gh auth status 2>&1)",
+      "PowerShell($git = \"C:\\\\Program Files\\\\Git\\\\bin\\\\git.exe\"; cd \"C:\\\\Users\\\\danie\\\\OneDrive\\\\Code\\\\30 Claude ai\\\\Project\\\\01 XXL\"; & $git config user.email \"zhujunfd@gmail.com\"; & $git config user.name \"danieljun2025\"; & $git add .; & $git commit -m \"Add xiao xiao le match-3 game\"; & $git branch -M main; & $git -c credential.helper=\"!`\"C:/Program Files/GitHub CLI/gh.exe`\" auth git-credential\" push -u origin main 2>&1)"
+    ]
+  }
+}
