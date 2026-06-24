@@ -1,376 +1,672 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>消消乐</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-family: 'Segoe UI', sans-serif;
-      color: #fff;
-    }
-
-    h1 {
-      font-size: 2.5rem;
-      margin-bottom: 10px;
-      text-shadow: 0 0 20px rgba(255, 200, 0, 0.8);
-      letter-spacing: 4px;
-    }
-
-    #scoreboard {
-      display: flex;
-      gap: 40px;
-      margin-bottom: 20px;
-      font-size: 1.1rem;
-    }
-
-    #scoreboard span {
-      background: rgba(255,255,255,0.1);
-      padding: 6px 20px;
-      border-radius: 20px;
-      border: 1px solid rgba(255,255,255,0.2);
-    }
-
-    #scoreboard strong {
-      color: #ffd700;
-      font-size: 1.3rem;
-    }
-
-    #board {
-      display: grid;
-      grid-template-columns: repeat(8, 60px);
-      grid-template-rows: repeat(8, 60px);
-      gap: 4px;
-      background: rgba(255,255,255,0.05);
-      padding: 10px;
-      border-radius: 16px;
-      border: 1px solid rgba(255,255,255,0.15);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-    }
-
-    .cell {
-      width: 60px;
-      height: 60px;
-      border-radius: 12px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.8rem;
-      transition: transform 0.1s, box-shadow 0.1s;
-      user-select: none;
-      border: 2px solid transparent;
-      position: relative;
-    }
-
-    .cell:hover { transform: scale(1.08); }
-
-    .cell.selected {
-      border-color: #fff;
-      box-shadow: 0 0 12px rgba(255,255,255,0.8);
-      transform: scale(1.12);
-      z-index: 10;
-    }
-
-    .cell.matched {
-      animation: pop 0.3s ease forwards;
-    }
-
-    .cell.fall {
-      animation: fallIn 0.4s ease;
-    }
-
-    @keyframes pop {
-      0%   { opacity: 1; }
-      100% { opacity: 0; }
-    }
-
-    @keyframes fallIn {
-      from { transform: translateY(-60px); opacity: 0; }
-      to   { transform: translateY(0);     opacity: 1; }
-    }
-
-    .c0 { background: linear-gradient(145deg, #ff6b6b, #cc0000); }
-    .c1 { background: linear-gradient(145deg, #ffd93d, #f0a500); }
-    .c2 { background: linear-gradient(145deg, #6bcb77, #2d8f3c); }
-    .c3 { background: linear-gradient(145deg, #4d96ff, #1a5cb8); }
-    .c4 { background: linear-gradient(145deg, #c77dff, #7b2fff); }
-    .c5 { background: linear-gradient(145deg, #ff9a3c, #c96a00); }
-
-    #message {
-      margin-top: 16px;
-      height: 30px;
-      font-size: 1.2rem;
-      color: #ffd700;
-      text-shadow: 0 0 8px rgba(255,215,0,0.6);
-      transition: opacity 0.3s;
-    }
-
-    #controls {
-      margin-top: 16px;
-      display: flex;
-      gap: 12px;
-    }
-
-    button {
-      padding: 10px 28px;
-      border: none;
-      border-radius: 24px;
-      font-size: 1rem;
-      cursor: pointer;
-      font-weight: bold;
-      transition: transform 0.1s, box-shadow 0.1s;
-    }
-
-    button:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-
-    #btnRestart {
-      background: linear-gradient(135deg, #ffd700, #ff9500);
-      color: #000;
-    }
-
-    #moves-left { color: #adf; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Match-3 MVP Prototype</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: 'Segoe UI', sans-serif; color: #fff; gap: 16px; padding: 20px;
+  }
+  h1 { font-size: 2rem; letter-spacing: 3px; text-shadow: 0 0 20px rgba(255,200,0,.8); }
+  /* ---------- Level Select ---------- */
+  #levelSelect { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .levelCard {
+    width: 280px; padding: 16px 20px; background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.2); border-radius: 14px; cursor: pointer;
+    transition: transform .15s, background .15s;
+  }
+  .levelCard:hover { transform: translateY(-3px); background: rgba(255,255,255,.13); }
+  .levelCard h3 { color: #ffd700; margin-bottom: 6px; }
+  .levelCard p { font-size: .85rem; opacity: .8; }
+  /* ---------- HUD ---------- */
+  #hud { display: none; flex-direction: column; align-items: center; gap: 8px; width: 420px; }
+  #hudRow { display: flex; justify-content: space-between; width: 100%; font-size: 1rem; }
+  #hudRow span strong { color: #ffd700; }
+  #progressOuter { width: 100%; height: 14px; background: rgba(255,255,255,.1); border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,.2); }
+  #progressInner { height: 100%; width: 0%; background: linear-gradient(90deg,#00c6ff,#0072ff); transition: width .3s ease; }
+  /* ---------- Board ---------- */
+  #boardWrap { display: none; }
+  #board {
+    position: relative;
+    display: grid; grid-template-columns: repeat(8, 48px); grid-template-rows: repeat(8, 48px);
+    gap: 4px; background: rgba(255,255,255,.05); padding: 10px; border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.15); box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  }
+  .tile {
+    position: absolute; width: 48px; height: 48px; border-radius: 10px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: bold;
+    transition: top .28s ease, left .28s ease, opacity .25s ease, transform .15s ease;
+    box-shadow: inset 0 0 6px rgba(0,0,0,.3);
+    user-select: none;
+  }
+  .tile.removing { opacity: 0; transform: scale(.3); }
+  .tile.selected { outline: 3px solid #fff; transform: scale(1.08); z-index: 5; }
+  .t1 { background: linear-gradient(145deg,#ff6b6b,#cc0000); }
+  .t2 { background: linear-gradient(145deg,#4dabf7,#0050b3); }
+  .t3 { background: linear-gradient(145deg,#69db7c,#1e7d22); }
+  .t4 { background: linear-gradient(145deg,#ffd43b,#e08e00); }
+  .t5 { background: linear-gradient(145deg,#cc5de8,#7d1aad); }
+  .special-lineH::after, .special-lineV::after { content:'\2194'; position:absolute; font-size:1.4rem; color:#fff; text-shadow:0 0 6px #000; }
+  .special-lineV::after { content:'\2195'; }
+  .special-bomb { box-shadow: 0 0 16px 4px #fff, inset 0 0 6px rgba(0,0,0,.3); }
+  .special-bomb::after { content:'\2605'; position:absolute; font-size:1.3rem; color:#fff; text-shadow:0 0 6px #000; }
+  /* ---------- Modal ---------- */
+  #modalOverlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6);
+    align-items: center; justify-content: center;
+  }
+  #modalBox {
+    background: #16213e; border: 1px solid rgba(255,255,255,.2); border-radius: 16px;
+    padding: 30px 40px; text-align: center; min-width: 260px;
+  }
+  #modalBox h2 { margin-bottom: 10px; }
+  #modalBox p { margin-bottom: 18px; opacity: .85; }
+  .modalBtn {
+    background: linear-gradient(135deg,#00c6ff,#0072ff); color: #fff; border: none;
+    padding: 10px 22px; border-radius: 10px; font-size: 1rem; cursor: pointer; margin: 0 6px;
+  }
+  .modalBtn.secondary { background: rgba(255,255,255,.15); }
+  #backBtn { background: none; border: 1px solid rgba(255,255,255,.3); color:#fff; padding:6px 14px; border-radius:8px; cursor:pointer; }
+</style>
 </head>
 <body>
-  <h1>消消乐</h1>
 
-  <div id="scoreboard">
-    <span>得分 <strong id="score">0</strong></span>
-    <span>步数 <strong id="moves">30</strong></span>
-    <span>目标 <strong id="target">500</strong></span>
+<h1>MATCH-3 :: MVP</h1>
+
+<div id="levelSelect">
+  <p style="opacity:.7;font-size:.85rem;">Select a level</p>
+  <div id="levelCards"></div>
+</div>
+
+<div id="hud">
+  <button id="backBtn">&larr; Levels</button>
+  <div id="hudRow">
+    <span>Moves: <strong id="movesVal">0</strong></span>
+    <span>Score: <strong id="scoreVal">0</strong></span>
+    <span>Target: <strong id="targetVal">0</strong></span>
   </div>
+  <div id="progressOuter"><div id="progressInner"></div></div>
+</div>
 
-  <div id="board"></div>
-  <div id="message"></div>
+<div id="boardWrap"><div id="board"></div></div>
 
-  <div id="controls">
-    <button id="btnRestart">重新开始</button>
+<div id="modalOverlay">
+  <div id="modalBox">
+    <h2 id="modalTitle"></h2>
+    <p id="modalMsg"></p>
+    <button class="modalBtn secondary" id="modalReplay">Replay</button>
+    <button class="modalBtn" id="modalNext">Next Level</button>
   </div>
+</div>
 
 <script>
-const ROWS = 8, COLS = 8;
-const GEMS = ['🔴','🟡','🟢','🔵','🟣','🟠'];
-const COLORS = ['c0','c1','c2','c3','c4','c5'];
-const TARGET = 500;
-const MAX_MOVES = 30;
+/* =========================================================================
+   GAME CORE ENGINE
+   Pure state + logic module. Holds the single source of truth for the grid.
+   Knows NOTHING about the DOM. Communicates outward only via emit()/log().
+   This separation guarantees the authoritative grid array can never be
+   desynchronized by a rendering glitch: the renderer only ever *reads*
+   engine.grid and *requests* animation handshakes, it never mutates state.
+   ========================================================================= */
+class GameEngine {
+  constructor(levelConfig) {
+    this.rows = 8;
+    this.cols = 8;
+    this.config = levelConfig;          // { target, moves }
+    this.grid = [];                     // grid[r][c] = {id, type, special, state} | null
+    this.state = 'INIT';                // IDLE | SWAP | MATCH_DETECTION | ELIMINATING | FALLING | GAME_OVER
+    this.score = 0;
+    this.movesLeft = levelConfig.moves;
+    this.combo = 0;
+    this._idSeq = 1;
+    this.listeners = {};
+  }
 
-let board = [], selected = null, score = 0, moves = MAX_MOVES, busy = false;
+  /* ---- tiny pub/sub so the renderer can react without the engine
+     needing to know what (or whether) anything is listening ---- */
+  on(event, cb) { (this.listeners[event] ??= []).push(cb); return this; }
+  emit(event, data) {
+    console.log(`[State]: ${event}`, data ?? '');
+    (this.listeners[event] || []).forEach(cb => cb(data));
+  }
 
-const boardEl = document.getElementById('board');
-const scoreEl = document.getElementById('score');
-const movesEl = document.getElementById('moves');
-const msgEl   = document.getElementById('message');
+  /* Returns a promise that resolves once the renderer calls done().
+     A safety timeout guarantees the engine never hangs forever even
+     if the UI layer fails to ack (defensive prototype behaviour). */
+  requestRender(event, data) {
+    return new Promise(resolve => {
+      let settled = false;
+      const done = () => { if (!settled) { settled = true; resolve(); } };
+      const timeout = setTimeout(done, 1500);
+      this.emit(event, { ...data, done: () => { clearTimeout(timeout); done(); } });
+    });
+  }
 
-function rand() { return Math.floor(Math.random() * GEMS.length); }
+  cloneGrid() {
+    return this.grid.map(row => row.map(t => t ? { ...t } : null));
+  }
 
-function initBoard() {
-  board = Array.from({length: ROWS}, () => Array.from({length: COLS}, rand));
-  // ensure no initial matches
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      while (hasMatchAt(r, c)) board[r][c] = rand();
+  randomType() { return 1 + Math.floor(Math.random() * 5); }
+
+  newTile(type) { return { id: this._idSeq++, type, special: null, state: 'idle' }; }
+
+  /* ---------------- INITIALIZATION / DEADLOCK PREVENTION ---------------- */
+  init() {
+    this.grid = this.generateValidBoard();
+    this.state = 'IDLE';
+    this.emit('init', { grid: this.cloneGrid() });
+  }
+
+  generateValidBoard() {
+    let attempts = 0;
+    let grid;
+    do {
+      grid = [];
+      for (let r = 0; r < this.rows; r++) {
+        const row = [];
+        for (let c = 0; c < this.cols; c++) {
+          // avoid trivially seeding an immediate match while filling
+          let type;
+          let tries = 0;
+          do {
+            type = this.randomType();
+            tries++;
+          } while (
+            tries < 10 && (
+              (c >= 2 && row[c - 1]?.type === type && row[c - 2]?.type === type) ||
+              (r >= 2 && grid[r - 1][c]?.type === type && grid[r - 2][c]?.type === type)
+            )
+          );
+          row.push(this.newTile(type));
+        }
+        grid.push(row);
+      }
+      attempts++;
+    } while ((this.findMatches(grid).length > 0 || !this.hasValidMove(grid)) && attempts < 200);
+
+    if (attempts >= 200) {
+      console.log('[State]: DEADLOCK_FALLBACK - forcing a guaranteed move');
+      grid[0][0].type = grid[0][1].type; // brute-force guarantee at least one move
+    }
+    return grid;
+  }
+
+  hasValidMove(grid) {
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        if (c + 1 < this.cols && this._swapCreatesMatch(grid, r, c, r, c + 1)) return true;
+        if (r + 1 < this.rows && this._swapCreatesMatch(grid, r, c, r + 1, c)) return true;
+      }
+    }
+    return false;
+  }
+
+  _swapCreatesMatch(grid, r1, c1, r2, c2) {
+    const a = grid[r1][c1], b = grid[r2][c2];
+    grid[r1][c1] = b; grid[r2][c2] = a;
+    const found = this.findMatches(grid).length > 0;
+    grid[r1][c1] = a; grid[r2][c2] = b;
+    return found;
+  }
+
+  /* ---------------- STATE MACHINE: PLAYER INPUT ---------------- */
+  async trySwap(r1, c1, r2, c2) {
+    if (this.state !== 'IDLE') return;
+    if (!this._isAdjacent(r1, c1, r2, c2)) return;
+
+    this.state = 'SWAP';
+    this.emit('stateChange', { state: this.state });
+    this._swapCells(r1, c1, r2, c2);
+    await this.requestRender('swap', { a: [r1, c1], b: [r2, c2] });
+
+    const matches = this.findMatches();
+    if (matches.length === 0) {
+      this.emit('revertSwap', { a: [r1, c1], b: [r2, c2] });
+      this._swapCells(r1, c1, r2, c2); // swap back
+      await this.requestRender('renderSync', { grid: this.cloneGrid() });
+      this.state = 'IDLE';
+      this.emit('stateChange', { state: this.state });
+      return;
+    }
+
+    // valid move: consumes one move from the turn-based economy
+    this.movesLeft = Math.max(0, this.movesLeft - 1);
+    this.combo = 0;
+    this.emit('moveSpent', { movesLeft: this.movesLeft });
+
+    await this.resolveCascade(matches, [r1, c1]);
+    this.checkWinLoss();
+  }
+
+  _isAdjacent(r1, c1, r2, c2) {
+    return (Math.abs(r1 - r2) + Math.abs(c1 - c2)) === 1;
+  }
+
+  _swapCells(r1, c1, r2, c2) {
+    const tmp = this.grid[r1][c1];
+    this.grid[r1][c1] = this.grid[r2][c2];
+    this.grid[r2][c2] = tmp;
+  }
+
+  /* ---------------- MATCH DETECTION ---------------- */
+  findMatches(grid = this.grid) {
+    const runs = [];
+    // horizontal runs
+    for (let r = 0; r < this.rows; r++) {
+      let c = 0;
+      while (c < this.cols) {
+        const t = grid[r][c]?.type;
+        let len = 1;
+        while (c + len < this.cols && grid[r][c + len]?.type === t) len++;
+        if (t != null && len >= 3) {
+          const cells = []; for (let k = 0; k < len; k++) cells.push([r, c + k]);
+          runs.push({ orientation: 'H', type: t, cells, length: len });
+        }
+        c += len;
+      }
+    }
+    // vertical runs
+    for (let c = 0; c < this.cols; c++) {
+      let r = 0;
+      while (r < this.rows) {
+        const t = grid[r][c]?.type;
+        let len = 1;
+        while (r + len < this.rows && grid[r + len][c]?.type === t) len++;
+        if (t != null && len >= 3) {
+          const cells = []; for (let k = 0; k < len; k++) cells.push([r + k, c]);
+          runs.push({ orientation: 'V', type: t, cells, length: len });
+        }
+        r += len;
+      }
+    }
+    if (runs.length === 0) return [];
+
+    // union runs that share a cell into clusters (handles cascades + T/L shapes)
+    const key = (r, c) => `${r},${c}`;
+    const cellToRuns = new Map();
+    runs.forEach((run, i) => run.cells.forEach(([r, c]) => {
+      const k = key(r, c);
+      if (!cellToRuns.has(k)) cellToRuns.set(k, []);
+      cellToRuns.get(k).push(i);
+    }));
+
+    const visited = new Set();
+    const clusters = [];
+    runs.forEach((_, i) => {
+      if (visited.has(i)) return;
+      const stack = [i], group = new Set();
+      while (stack.length) {
+        const idx = stack.pop();
+        if (group.has(idx)) continue;
+        group.add(idx); visited.add(idx);
+        runs[idx].cells.forEach(([r, c]) => {
+          cellToRuns.get(key(r, c)).forEach(j => { if (!group.has(j)) stack.push(j); });
+        });
+      }
+      const groupRuns = [...group].map(idx => runs[idx]);
+      const cellSet = new Map();
+      groupRuns.forEach(run => run.cells.forEach(([r, c]) => cellSet.set(key(r, c), [r, c])));
+      const orientations = new Set(groupRuns.map(r => r.orientation));
+      clusters.push({
+        cells: [...cellSet.values()],
+        type: groupRuns[0].type,
+        maxLength: Math.max(...groupRuns.map(r => r.length)),
+        crossShape: orientations.size > 1,
+        dominantOrientation: groupRuns.reduce((a, b) => a.length >= b.length ? a : b).orientation,
+      });
+    });
+    return clusters;
+  }
+
+  /* ---------------- ELIMINATION, SPECIAL SPAWN, SCORING ---------------- */
+  eliminateMatches(matches, swapHint) {
+    const toRemove = new Set();
+    const spawns = []; // {r,c,type,special}
+    const key = (r, c) => `${r},${c}`;
+
+    matches.forEach(cluster => {
+      cluster.cells.forEach(([r, c]) => toRemove.add(key(r, c)));
+
+      let special = null;
+      if (cluster.cells.length >= 5 || cluster.crossShape) special = 'bomb';
+      else if (cluster.maxLength === 4) special = cluster.dominantOrientation === 'H' ? 'lineH' : 'lineV';
+
+      if (special) {
+        // spawn at the cell the player just moved into, if it belongs to this
+        // cluster, otherwise fall back to the cluster's first cell
+        let spawnCell = cluster.cells[0];
+        if (swapHint) {
+          const hit = cluster.cells.find(([r, c]) => r === swapHint[0] && c === swapHint[1]);
+          if (hit) spawnCell = hit;
+        }
+        spawns.push({ r: spawnCell[0], c: spawnCell[1], type: cluster.type, special });
+        toRemove.delete(key(spawnCell[0], spawnCell[1])); // the spawn cell survives as the special tile
+      }
+    });
+
+    // chain-trigger any PRE-EXISTING special tiles caught in the blast
+    const queue = [...toRemove];
+    const processed = new Set();
+    while (queue.length) {
+      const k = queue.pop();
+      if (processed.has(k)) continue;
+      processed.add(k);
+      const [r, c] = k.split(',').map(Number);
+      const tile = this.grid[r][c];
+      if (!tile || !tile.special) continue;
+      const extra = this._specialEffectCells(r, c, tile.special, tile.type);
+      extra.forEach(([er, ec]) => {
+        const ek = key(er, ec);
+        if (!toRemove.has(ek)) { toRemove.add(ek); queue.push(ek); }
+      });
+    }
+
+    let clearedCount = 0;
+    toRemove.forEach(k => {
+      const [r, c] = k.split(',').map(Number);
+      if (this.grid[r][c]) { this.grid[r][c] = null; clearedCount++; }
+    });
+    spawns.forEach(s => {
+      this.grid[s.r][s.c] = { id: this._idSeq++, type: s.type, special: s.special, state: 'idle' };
+    });
+
+    return { clearedCount, spawns, removedCells: [...toRemove].map(k => k.split(',').map(Number)) };
+  }
+
+  _specialEffectCells(r, c, special, type) {
+    const cells = [];
+    if (special === 'lineH') for (let cc = 0; cc < this.cols; cc++) cells.push([r, cc]);
+    else if (special === 'lineV') for (let rr = 0; rr < this.rows; rr++) cells.push([rr, c]);
+    else if (special === 'bomb') {
+      for (let rr = 0; rr < this.rows; rr++)
+        for (let cc = 0; cc < this.cols; cc++)
+          if (this.grid[rr][cc]?.type === type) cells.push([rr, cc]);
+    }
+    return cells;
+  }
+
+  /* ---------------- GRAVITY & REFILL ---------------- */
+  applyGravityAndRefill() {
+    const moved = [];
+    const spawned = [];
+    for (let c = 0; c < this.cols; c++) {
+      const stack = [];
+      for (let r = this.rows - 1; r >= 0; r--) {
+        if (this.grid[r][c]) stack.push(this.grid[r][c]);
+      }
+      // stack[0] is the lowest existing tile; place from bottom up
+      for (let r = this.rows - 1, i = 0; r >= 0; r--, i++) {
+        const tile = stack[i] || null;
+        const prevCellHadThisTile = false;
+        if (tile) {
+          if (this.grid[r][c] !== tile) moved.push({ id: tile.id, toR: r, toC: c });
+          this.grid[r][c] = tile;
+        } else {
+          const fresh = this.newTile(this.randomType());
+          this.grid[r][c] = fresh;
+          spawned.push({ id: fresh.id, r, c, type: fresh.type });
+        }
+      }
+    }
+    return { moved, spawned };
+  }
+
+  /* ---------------- CASCADE LOOP (MATCH -> ELIMINATE -> FALL -> repeat) ---------------- */
+  async resolveCascade(initialMatches, swapHint) {
+    let matches = initialMatches;
+    let hint = swapHint;
+    while (matches.length > 0) {
+      this.combo++;
+      this.state = 'ELIMINATING';
+      this.emit('stateChange', { state: this.state });
+
+      const { clearedCount, spawns, removedCells } = this.eliminateMatches(matches, hint);
+      const gained = Math.round(clearedCount * 100 * (1 + (this.combo - 1) * 0.5));
+      this.score += gained;
+
+      await this.requestRender('eliminate', {
+        removedCells, spawns, gained, combo: this.combo, score: this.score,
+      });
+
+      this.state = 'FALLING';
+      this.emit('stateChange', { state: this.state });
+      const fallData = this.applyGravityAndRefill();
+      await this.requestRender('fall', fallData);
+
+      this.state = 'MATCH_DETECTION';
+      this.emit('stateChange', { state: this.state });
+      matches = this.findMatches();
+      hint = null; // only the original swap location gets spawn priority
+    }
+
+    // soft-lock guard: if cascades leave a board with no possible move, reshuffle
+    if (!this.hasValidMove(this.grid)) {
+      console.log('[State]: NO_VALID_MOVES - reshuffling board');
+      this.grid = this.generateValidBoard();
+      await this.requestRender('renderSync', { grid: this.cloneGrid() });
+    }
+  }
+
+  /* ---------------- WIN / LOSS ---------------- */
+  checkWinLoss() {
+    this.state = 'CHECK_WIN_LOSS';
+    this.emit('stateChange', { state: this.state });
+    if (this.score >= this.config.target) {
+      this.state = 'GAME_OVER';
+      this.emit('gameOver', { result: 'WIN', score: this.score });
+    } else if (this.movesLeft <= 0) {
+      this.state = 'GAME_OVER';
+      this.emit('gameOver', { result: 'LOSS', score: this.score });
+    } else {
+      this.state = 'IDLE';
+      this.emit('stateChange', { state: this.state });
     }
   }
 }
 
-function hasMatchAt(r, c) {
-  const v = board[r][c];
-  if (c >= 2 && board[r][c-1] === v && board[r][c-2] === v) return true;
-  if (r >= 2 && board[r-1][c] === v && board[r-2][c] === v) return true;
-  return false;
-}
+/* =========================================================================
+   RENDERER
+   Reads engine state, manages DOM only. Never mutates engine.grid directly.
+   Every animation handshake ends by calling done() so the engine can
+   proceed — and a full DOM rebuild always sources truth from engine.grid,
+   so a dropped/late animation frame can never leave the UI out of sync
+   with the real grid array.
+   ========================================================================= */
+class GameRenderer {
+  constructor(engine, boardEl) {
+    this.engine = engine;
+    this.boardEl = boardEl;
+    this.cellSize = 52; // 48px tile + 4px gap
+    this.elements = new Map(); // tile id -> DOM node
+    this.selected = null;
 
-function render() {
-  boardEl.innerHTML = '';
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const cell = document.createElement('div');
-      const v = board[r][c];
-      cell.className = `cell ${COLORS[v]}`;
-      cell.textContent = GEMS[v];
-      cell.dataset.r = r;
-      cell.dataset.c = c;
-      cell.addEventListener('click', onCellClick);
-      boardEl.appendChild(cell);
-    }
-  }
-}
+    engine.on('init', ({ grid }) => this.fullRebuild(grid));
+    engine.on('swap', (d) => this.handleSwap(d));
+    engine.on('revertSwap', (d) => this.handleSwap(d));
+    engine.on('eliminate', (d) => this.handleEliminate(d));
+    engine.on('fall', (d) => this.handleFall(d));
+    engine.on('renderSync', (d) => this.handleSync(d));
 
-function cellEl(r, c) {
-  return boardEl.children[r * COLS + c];
-}
-
-async function onCellClick(e) {
-  if (busy || moves <= 0) return;
-  const r = +e.currentTarget.dataset.r;
-  const c = +e.currentTarget.dataset.c;
-
-  if (!selected) {
-    selected = {r, c};
-    cellEl(r, c).classList.add('selected');
-    return;
+    boardEl.addEventListener('click', (e) => this.handleClick(e));
   }
 
-  const {r: sr, c: sc} = selected;
-  cellEl(sr, sc).classList.remove('selected');
+  posStyle(r, c) { return { top: `${10 + r * this.cellSize}px`, left: `${10 + c * this.cellSize}px` }; }
 
-  if (sr === r && sc === c) { selected = null; return; }
-
-  const adjacent = (Math.abs(r - sr) + Math.abs(c - sc)) === 1;
-  if (!adjacent) {
-    selected = {r, c};
-    cellEl(r, c).classList.add('selected');
-    return;
-  }
-
-  selected = null;
-  busy = true;
-
-  swap(sr, sc, r, c);
-  render();
-
-  const matched = findMatches();
-  if (matched.size === 0) {
-    // revert
-    await sleep(150);
-    swap(sr, sc, r, c);
-    render();
-    busy = false;
-    return;
-  }
-
-  moves--;
-  movesEl.textContent = moves;
-  await processMatches(matched);
-  busy = false;
-
-  if (score >= TARGET) {
-    showMsg('🎉 恭喜过关！');
-  } else if (moves <= 0) {
-    showMsg('💔 游戏结束！');
-  }
-}
-
-function swap(r1, c1, r2, c2) {
-  [board[r1][c1], board[r2][c2]] = [board[r2][c2], board[r1][c1]];
-}
-
-function findMatches() {
-  const matched = new Set();
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS - 2; c++) {
-      const v = board[r][c];
-      if (v === board[r][c+1] && v === board[r][c+2]) {
-        matched.add(`${r},${c}`);
-        matched.add(`${r},${c+1}`);
-        matched.add(`${r},${c+2}`);
+  fullRebuild(grid) {
+    this.boardEl.innerHTML = '';
+    this.elements.clear();
+    for (let r = 0; r < grid.length; r++) {
+      for (let c = 0; c < grid[r].length; c++) {
+        const tile = grid[r][c];
+        if (!tile) continue;
+        this.createTileEl(tile, r, c);
       }
     }
   }
-  for (let c = 0; c < COLS; c++) {
-    for (let r = 0; r < ROWS - 2; r++) {
-      const v = board[r][c];
-      if (v === board[r+1][c] && v === board[r+2][c]) {
-        matched.add(`${r},${c}`);
-        matched.add(`${r+1},${c}`);
-        matched.add(`${r+2},${c}`);
+
+  createTileEl(tile, r, c) {
+    const el = document.createElement('div');
+    el.className = `tile t${tile.type}` + (tile.special ? ` special-${tile.special}` : '');
+    Object.assign(el.style, this.posStyle(r, c));
+    el.dataset.r = r; el.dataset.c = c; el.dataset.id = tile.id;
+    this.boardEl.appendChild(el);
+    this.elements.set(tile.id, el);
+    return el;
+  }
+
+  async handleSwap({ a, b, done }) {
+    // engine.grid already holds the post-swap (or reverted) truth; just
+    // re-read the current owners of cells a/b and move their DOM nodes.
+    const grid = this.engine.grid;
+    const tileA = grid[a[0]][a[1]], tileB = grid[b[0]][b[1]];
+    if (tileA) Object.assign(this.elements.get(tileA.id).style, this.posStyle(a[0], a[1]));
+    if (tileB) Object.assign(this.elements.get(tileB.id).style, this.posStyle(b[0], b[1]));
+    setTimeout(done, 220);
+  }
+
+  async handleEliminate({ removedCells, spawns, gained, combo, score, done }) {
+    removedCells.forEach(([r, c]) => {
+      // find element currently rendered at this position
+      const el = this.elements.get(this._idAt(r, c, 'before'));
+    });
+    // simplest reliable approach: mark-and-remove by scanning current DOM
+    // nodes whose stored r/c match a removed cell BEFORE the spawn overwrote it
+    removedCells.forEach(([r, c]) => {
+      const node = [...this.elements.values()].find(el => +el.dataset.r === r && +el.dataset.c === c);
+      if (node) {
+        node.classList.add('removing');
+        const id = +node.dataset.id;
+        setTimeout(() => { node.remove(); this.elements.delete(id); }, 260);
       }
-    }
-  }
-  return matched;
-}
-
-async function processMatches(matched) {
-  // animate removal
-  matched.forEach(key => {
-    const [r, c] = key.split(',').map(Number);
-    cellEl(r, c).classList.add('matched');
-  });
-  score += matched.size * 10;
-  scoreEl.textContent = score;
-  showMsg(`+${matched.size * 10}`);
-  await sleep(350);
-
-  // remove matched cells (set to -1)
-  matched.forEach(key => {
-    const [r, c] = key.split(',').map(Number);
-    board[r][c] = -1;
-  });
-
-  // drop tiles down and track which cells move
-  const movedCells = new Set();
-  for (let c = 0; c < COLS; c++) {
-    let empty = ROWS - 1;
-    for (let r = ROWS - 1; r >= 0; r--) {
-      if (board[r][c] !== -1) {
-        if (empty !== r) movedCells.add(`${empty},${c}`);
-        board[empty][c] = board[r][c];
-        if (empty !== r) board[r][c] = -1;
-        empty--;
-      }
-    }
-    for (let r = empty; r >= 0; r--) {
-      board[r][c] = rand();
-      movedCells.add(`${r},${c}`);
-    }
+    });
+    spawns.forEach(s => {
+      const tile = this.engine.grid[s.r][s.c];
+      const node = [...this.elements.values()].find(el => +el.dataset.r === s.r && +el.dataset.c === s.c);
+      if (node) { node.remove(); this.elements.delete(+node.dataset.id); }
+      this.createTileEl(tile, s.r, s.c);
+    });
+    this.updateHud(score, gained, combo);
+    setTimeout(done, 280);
   }
 
-  render();
+  _idAt() { return undefined; }
 
-  // set fall cells to invisible before animation
-  movedCells.forEach(key => {
-    const [r, c] = key.split(',').map(Number);
-    const cell = cellEl(r, c);
-    cell.style.opacity = '0';
-    // force reflow
-    void cell.offsetWidth;
-    cell.classList.add('fall');
-  });
-  
-  await sleep(450);
-  
-  // clear inline opacity
-  movedCells.forEach(key => {
-    const [r, c] = key.split(',').map(Number);
-    cellEl(r, c).style.opacity = '';
-    cellEl(r, c).classList.remove('fall');
-  });
+  async handleFall({ moved, spawned, done }) {
+    moved.forEach(m => {
+      const el = this.elements.get(m.id);
+      if (el) { el.dataset.r = m.toR; el.dataset.c = m.toC; Object.assign(el.style, this.posStyle(m.toR, m.toC)); }
+    });
+    spawned.forEach(s => {
+      const tile = this.engine.grid[s.r][s.c];
+      const el = this.createTileEl(tile, -1, s.c); // start above the board
+      requestAnimationFrame(() => { el.dataset.r = s.r; Object.assign(el.style, this.posStyle(s.r, s.c)); });
+    });
+    setTimeout(done, 320);
+  }
 
-  // check for chain matches
-  const next = findMatches();
-  if (next.size > 0) {
-    await processMatches(next);
+  handleSync({ grid, done }) {
+    this.fullRebuild(grid || this.engine.cloneGrid());
+    if (done) setTimeout(done, 50);
+  }
+
+  updateHud(score, gained, combo) {
+    document.getElementById('scoreVal').textContent = score;
+    const pct = Math.min(100, (score / this.engine.config.target) * 100);
+    document.getElementById('progressInner').style.width = pct + '%';
+    document.getElementById('movesVal').textContent = this.engine.movesLeft;
+  }
+
+  handleClick(e) {
+    const el = e.target.closest('.tile');
+    if (!el) return;
+    const r = +el.dataset.r, c = +el.dataset.c;
+    if (!this.selected) {
+      this.selected = { r, c, el };
+      el.classList.add('selected');
+      return;
+    }
+    const prev = this.selected;
+    prev.el.classList.remove('selected');
+    this.selected = null;
+    if (prev.r === r && prev.c === c) return;
+    this.engine.trySwap(prev.r, prev.c, r, c);
   }
 }
 
-function showMsg(text) {
-  msgEl.textContent = text;
-  setTimeout(() => { msgEl.textContent = ''; }, 1200);
+/* =========================================================================
+   APP BOOTSTRAP / LEVEL MANAGEMENT
+   ========================================================================= */
+const LEVELS = [
+  { id: 1, name: 'Level 1 — Onboarding', target: 3000, moves: 20 },
+  { id: 2, name: 'Level 2 — Cascade Test', target: 5000, moves: 25 },
+  { id: 3, name: 'Level 3 — Challenge', target: 8000, moves: 22 },
+];
+
+let currentEngine = null;
+let currentLevelIndex = 0;
+
+function renderLevelCards() {
+  const wrap = document.getElementById('levelCards');
+  wrap.innerHTML = '';
+  LEVELS.forEach((lvl, i) => {
+    const card = document.createElement('div');
+    card.className = 'levelCard';
+    card.innerHTML = `<h3>${lvl.name}</h3><p>Target ${lvl.target.toLocaleString()} pts &middot; ${lvl.moves} moves</p>`;
+    card.addEventListener('click', () => startLevel(i));
+    wrap.appendChild(card);
+  });
 }
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function startLevel(index) {
+  currentLevelIndex = index;
+  const cfg = LEVELS[index];
+  document.getElementById('levelSelect').style.display = 'none';
+  document.getElementById('hud').style.display = 'flex';
+  document.getElementById('boardWrap').style.display = 'block';
+  document.getElementById('modalOverlay').style.display = 'none';
 
-function startGame() {
-  score = 0; moves = MAX_MOVES; selected = null; busy = false;
-  scoreEl.textContent = 0;
-  movesEl.textContent = moves;
-  msgEl.textContent = '';
-  initBoard();
-  render();
+  document.getElementById('movesVal').textContent = cfg.moves;
+  document.getElementById('scoreVal').textContent = 0;
+  document.getElementById('targetVal').textContent = cfg.target;
+  document.getElementById('progressInner').style.width = '0%';
+
+  currentEngine = new GameEngine({ target: cfg.target, moves: cfg.moves });
+  const boardEl = document.getElementById('board');
+  new GameRenderer(currentEngine, boardEl);
+
+  currentEngine.on('moveSpent', ({ movesLeft }) => {
+    document.getElementById('movesVal').textContent = movesLeft;
+  });
+  currentEngine.on('gameOver', ({ result, score }) => showModal(result, score, cfg));
+
+  currentEngine.init();
 }
 
-document.getElementById('btnRestart').addEventListener('click', startGame);
+function showModal(result, score, cfg) {
+  document.getElementById('modalOverlay').style.display = 'flex';
+  document.getElementById('modalTitle').textContent = result === 'WIN' ? 'Level Complete!' : 'Out of Moves';
+  document.getElementById('modalMsg').textContent =
+    `Score: ${score} / Target: ${cfg.target}`;
+  const nextBtn = document.getElementById('modalNext');
+  const hasNext = result === 'WIN' && currentLevelIndex < LEVELS.length - 1;
+  nextBtn.style.display = hasNext ? 'inline-block' : 'none';
+}
 
-startGame();
+document.getElementById('modalReplay').addEventListener('click', () => startLevel(currentLevelIndex));
+document.getElementById('modalNext').addEventListener('click', () => startLevel(currentLevelIndex + 1));
+document.getElementById('backBtn').addEventListener('click', () => {
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('boardWrap').style.display = 'none';
+  document.getElementById('modalOverlay').style.display = 'none';
+  document.getElementById('levelSelect').style.display = 'flex';
+});
+
+renderLevelCards();
 </script>
 </body>
 </html>
