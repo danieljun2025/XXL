@@ -11,7 +11,8 @@
       "Bash(where npx *)",
       "Bash(gh auth *)",
       "PowerShell(gh auth status 2>&1)",
-      "PowerShell($git = \"C:\\\\Program Files\\\\Git\\\\bin\\\\git.exe\"; cd \"C:\\\\Users\\\\danie\\\\OneDrive\\\\Code\\\\30 Claude ai\\\\Project\\\\01 XXL\"; & $git config user.email \"zhujunfd@gmail.com\"; & $git config user.name \"danieljun2025\"; & $git add .; & $git commit -m \"Add xiao xiao le match-3 game\"; & $git branch -M main; & $git -c credential.helper=\"!`\"C:/Program Files/GitHub CLI/gh.exe`\" auth git-credential\" push -u origin main 2>&1)"
+      "PowerShell($git = \"C:\\\\Program Files\\\\Git\\\\bin\\\\git.exe\"; cd \"C:\\\\Users\\\\danie\\\\OneDrive\\\\Code\\\\30 Claude ai\\\\Project\\\\01 XXL\"; & $git config user.email \"zhujunfd@gmail.com\"; & $git config user.name \"danieljun2025\"; & $git add .; & $git commit -m \"Add xiao xiao le match-3 game\"; & $git branch -M main; & $git -c credential.helper=\"!`\"C:/Program Files/GitHub CLI/gh.exe`\" auth git-credential\" push -u origin main 2>&1)",
+      "PowerShell($json = '{\"cname\":\"matchgamers.com\"}'; $tmpFile = \"$env:TEMP\\\\cname.json\"; [System.IO.File]::WriteAllText\\($tmpFile, $json\\); & \"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" api repos/danieljun2025/XXL/pages --method PUT --input $tmpFile 2>&1)"
     ]
   }
 }
