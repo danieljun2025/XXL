@@ -85,18 +85,17 @@
     }
 
     .cell.fall {
-      animation: fallIn 0.25s ease;
+      animation: fallIn 0.4s ease;
     }
 
     @keyframes pop {
-      0%   { transform: scale(1); opacity: 1; }
-      50%  { transform: scale(1.3); opacity: 0.6; }
-      100% { transform: scale(0); opacity: 0; }
+      0%   { opacity: 1; }
+      100% { opacity: 0; }
     }
 
     @keyframes fallIn {
-      from { transform: translateY(-30px); opacity: 0; }
-      to   { transform: translateY(0);    opacity: 1; }
+      from { transform: translateY(-60px); opacity: 0; }
+      to   { transform: translateY(0);     opacity: 1; }
     }
 
     .c0 { background: linear-gradient(145deg, #ff6b6b, #cc0000); }
@@ -307,11 +306,13 @@ async function processMatches(matched) {
     board[r][c] = -1;
   });
 
-  // drop tiles down
+  // drop tiles down and track which cells move
+  const movedCells = new Set();
   for (let c = 0; c < COLS; c++) {
     let empty = ROWS - 1;
     for (let r = ROWS - 1; r >= 0; r--) {
       if (board[r][c] !== -1) {
+        if (empty !== r) movedCells.add(`${empty},${c}`);
         board[empty][c] = board[r][c];
         if (empty !== r) board[r][c] = -1;
         empty--;
@@ -319,14 +320,30 @@ async function processMatches(matched) {
     }
     for (let r = empty; r >= 0; r--) {
       board[r][c] = rand();
+      movedCells.add(`${r},${c}`);
     }
   }
 
   render();
 
-  // animate fall
-  document.querySelectorAll('.cell').forEach(el => el.classList.add('fall'));
-  await sleep(300);
+  // set fall cells to invisible before animation
+  movedCells.forEach(key => {
+    const [r, c] = key.split(',').map(Number);
+    const cell = cellEl(r, c);
+    cell.style.opacity = '0';
+    // force reflow
+    void cell.offsetWidth;
+    cell.classList.add('fall');
+  });
+  
+  await sleep(450);
+  
+  // clear inline opacity
+  movedCells.forEach(key => {
+    const [r, c] = key.split(',').map(Number);
+    cellEl(r, c).style.opacity = '';
+    cellEl(r, c).classList.remove('fall');
+  });
 
   // check for chain matches
   const next = findMatches();
