@@ -51,6 +51,12 @@
   .t3 { background: linear-gradient(145deg,#69db7c,#1e7d22); }
   .t4 { background: linear-gradient(145deg,#ffd43b,#e08e00); }
   .t5 { background: linear-gradient(145deg,#cc5de8,#7d1aad); }
+  .t6 { background: linear-gradient(145deg,#3bc9db,#0b7285); }
+  .t7 { background: linear-gradient(145deg,#ff922b,#c2410c); }
+  /* per-level tile shapes (set via board class) */
+  #board.shape-circle .tile { border-radius: 50%; }
+  #board.shape-squircle .tile { border-radius: 30%; }
+  #board.shape-sharp .tile { border-radius: 3px; }
   .special-lineH::after, .special-lineV::after { content:'\2194'; position:absolute; font-size:1.4rem; color:#fff; text-shadow:0 0 6px #000; }
   .special-lineV::after { content:'\2195'; }
   .special-bomb { box-shadow: 0 0 16px 4px #fff, inset 0 0 6px rgba(0,0,0,.3); }
@@ -115,9 +121,10 @@
    ========================================================================= */
 class GameEngine {
   constructor(levelConfig) {
-    this.rows = 8;
-    this.cols = 8;
-    this.config = levelConfig;          // { target, moves }
+    this.rows = levelConfig.rows ?? 8;
+    this.cols = levelConfig.cols ?? 8;
+    this.numTypes = levelConfig.types ?? 5;   // how many tile colours are in play
+    this.config = levelConfig;          // { target, moves, rows, cols, types }
     this.grid = [];                     // grid[r][c] = {id, type, special, state} | null
     this.state = 'INIT';                // IDLE | SWAP | MATCH_DETECTION | ELIMINATING | FALLING | GAME_OVER
     this.score = 0;
@@ -151,7 +158,7 @@ class GameEngine {
     return this.grid.map(row => row.map(t => t ? { ...t } : null));
   }
 
-  randomType() { return 1 + Math.floor(Math.random() * 5); }
+  randomType() { return 1 + Math.floor(Math.random() * this.numTypes); }
 
   newTile(type) { return { id: this._idSeq++, type, special: null, state: 'idle' }; }
 
@@ -602,16 +609,17 @@ class GameRenderer {
    APP BOOTSTRAP / LEVEL MANAGEMENT
    ========================================================================= */
 const LEVELS = [
-  { id: 1, name: 'Level 1 — Onboarding', target: 4500, moves: 18 },
-  { id: 2, name: 'Level 2 — Cascade Test', target: 7500, moves: 22 },
-  { id: 3, name: 'Level 3 — Challenge', target: 11000, moves: 20 },
-  { id: 4, name: 'Level 4 — Warm Streak', target: 13000, moves: 22 },
-  { id: 5, name: 'Level 5 — Tight Squeeze', target: 15000, moves: 20 },
-  { id: 6, name: 'Level 6 — Chain Reaction', target: 18000, moves: 22 },
-  { id: 7, name: 'Level 7 — Combo Hunter', target: 21000, moves: 22 },
-  { id: 8, name: 'Level 8 — High Stakes', target: 24000, moves: 20 },
-  { id: 9, name: 'Level 9 — Precision', target: 27000, moves: 20 },
-  { id: 10, name: 'Level 10 — Grand Finale', target: 32000, moves: 22 },
+  // rows x cols, `types` = number of tile colours, `shape` = tile look
+  { id: 1,  name: 'Level 1 — Onboarding',     rows: 6, cols: 6, types: 4, shape: 'rounded',  target: 4000,  moves: 18 },
+  { id: 2,  name: 'Level 2 — Bubble Pop',     rows: 7, cols: 7, types: 4, shape: 'circle',   target: 6500,  moves: 20 },
+  { id: 3,  name: 'Level 3 — Classic',        rows: 8, cols: 8, types: 5, shape: 'rounded',  target: 9500,  moves: 20 },
+  { id: 4,  name: 'Level 4 — Tall Tower',     rows: 9, cols: 6, types: 5, shape: 'sharp',    target: 10000, moves: 20 },
+  { id: 5,  name: 'Level 5 — Wide Open',      rows: 6, cols: 9, types: 5, shape: 'circle',   target: 10500, moves: 20 },
+  { id: 6,  name: 'Level 6 — Six Colours',    rows: 7, cols: 7, types: 6, shape: 'squircle', target: 11000, moves: 22 },
+  { id: 7,  name: 'Level 7 — Sharp Minds',    rows: 8, cols: 8, types: 6, shape: 'sharp',    target: 13000, moves: 22 },
+  { id: 8,  name: 'Level 8 — Tight Squeeze',  rows: 6, cols: 6, types: 5, shape: 'squircle', target: 8000,  moves: 14 },
+  { id: 9,  name: 'Level 9 — Rainbow',        rows: 8, cols: 8, types: 7, shape: 'circle',   target: 14000, moves: 24 },
+  { id: 10, name: 'Level 10 — Grand Finale',  rows: 9, cols: 9, types: 7, shape: 'squircle', target: 20000, moves: 25 },
 ];
 
 let currentEngine = null;
@@ -623,7 +631,7 @@ function renderLevelCards() {
   LEVELS.forEach((lvl, i) => {
     const card = document.createElement('div');
     card.className = 'levelCard';
-    card.innerHTML = `<h3>${lvl.name}</h3><p>Target ${lvl.target.toLocaleString()} pts &middot; ${lvl.moves} moves</p>`;
+    card.innerHTML = `<h3>${lvl.name}</h3><p>Target ${lvl.target.toLocaleString()} pts &middot; ${lvl.moves} moves &middot; ${lvl.cols}&times;${lvl.rows} board &middot; ${lvl.types} colours</p>`;
     card.addEventListener('click', () => startLevel(i));
     wrap.appendChild(card);
   });
@@ -642,8 +650,11 @@ function startLevel(index) {
   document.getElementById('targetVal').textContent = cfg.target;
   document.getElementById('progressInner').style.width = '0%';
 
-  currentEngine = new GameEngine({ target: cfg.target, moves: cfg.moves });
+  currentEngine = new GameEngine(cfg);
   const boardEl = document.getElementById('board');
+  boardEl.className = `shape-${cfg.shape}`;
+  boardEl.style.gridTemplateColumns = `repeat(${cfg.cols}, 48px)`;
+  boardEl.style.gridTemplateRows = `repeat(${cfg.rows}, 48px)`;
   new GameRenderer(currentEngine, boardEl);
 
   currentEngine.on('moveSpent', ({ movesLeft }) => {
