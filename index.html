@@ -22,6 +22,8 @@
   }
   .levelCard:hover { transform: translateY(-3px); background: rgba(255,255,255,.13); }
   .levelCard h3 { color: #ffd700; margin-bottom: 6px; }
+  .levelCard.locked { opacity: .4; cursor: not-allowed; }
+  .levelCard.locked:hover { transform: none; background: rgba(255,255,255,.07); }
   .levelCard p { font-size: .85rem; opacity: .8; }
   /* ---------- HUD ---------- */
   #hud { display: none; flex-direction: column; align-items: center; gap: 8px; width: 420px; }
@@ -609,18 +611,32 @@ class GameRenderer {
    APP BOOTSTRAP / LEVEL MANAGEMENT
    ========================================================================= */
 const LEVELS = [
-  // rows x cols, `types` = number of tile colours, `shape` = tile look
-  { id: 1,  name: 'Level 1 — Onboarding',     rows: 6, cols: 6, types: 4, shape: 'rounded',  target: 4000,  moves: 18 },
-  { id: 2,  name: 'Level 2 — Bubble Pop',     rows: 7, cols: 7, types: 4, shape: 'circle',   target: 6500,  moves: 20 },
-  { id: 3,  name: 'Level 3 — Classic',        rows: 8, cols: 8, types: 5, shape: 'rounded',  target: 9500,  moves: 20 },
-  { id: 4,  name: 'Level 4 — Tall Tower',     rows: 9, cols: 6, types: 5, shape: 'sharp',    target: 10000, moves: 20 },
-  { id: 5,  name: 'Level 5 — Wide Open',      rows: 6, cols: 9, types: 5, shape: 'circle',   target: 10500, moves: 20 },
-  { id: 6,  name: 'Level 6 — Six Colours',    rows: 7, cols: 7, types: 6, shape: 'squircle', target: 11000, moves: 22 },
-  { id: 7,  name: 'Level 7 — Sharp Minds',    rows: 8, cols: 8, types: 6, shape: 'sharp',    target: 13000, moves: 22 },
-  { id: 8,  name: 'Level 8 — Tight Squeeze',  rows: 6, cols: 6, types: 5, shape: 'squircle', target: 8000,  moves: 14 },
-  { id: 9,  name: 'Level 9 — Rainbow',        rows: 8, cols: 8, types: 7, shape: 'circle',   target: 14000, moves: 24 },
-  { id: 10, name: 'Level 10 — Grand Finale',  rows: 9, cols: 9, types: 7, shape: 'squircle', target: 20000, moves: 25 },
+  // rows x cols, `types` = number of tile colours, `shape` = tile look.
+  // Difficulty rises every level: required points per move climbs from 200 to 650.
+  { id: 1,  name: 'Level 1 — Onboarding',     rows: 6, cols: 6, types: 4, shape: 'rounded',  target: 4000,  moves: 20 },
+  { id: 2,  name: 'Level 2 — Bubble Pop',     rows: 7, cols: 7, types: 4, shape: 'circle',   target: 5200,  moves: 20 },
+  { id: 3,  name: 'Level 3 — Classic',        rows: 8, cols: 8, types: 5, shape: 'rounded',  target: 6600,  moves: 20 },
+  { id: 4,  name: 'Level 4 — Tall Tower',     rows: 9, cols: 6, types: 5, shape: 'sharp',    target: 7000,  moves: 19 },
+  { id: 5,  name: 'Level 5 — Wide Open',      rows: 6, cols: 9, types: 5, shape: 'circle',   target: 7200,  moves: 18 },
+  { id: 6,  name: 'Level 6 — Six Colours',    rows: 7, cols: 7, types: 6, shape: 'squircle', target: 7800,  moves: 18 },
+  { id: 7,  name: 'Level 7 — Sharp Minds',    rows: 8, cols: 8, types: 6, shape: 'sharp',    target: 8600,  moves: 18 },
+  { id: 8,  name: 'Level 8 — Tight Squeeze',  rows: 6, cols: 6, types: 6, shape: 'squircle', target: 8000,  moves: 16 },
+  { id: 9,  name: 'Level 9 — Rainbow',        rows: 8, cols: 8, types: 7, shape: 'circle',   target: 9300,  moves: 17 },
+  { id: 10, name: 'Level 10 — Grand Finale',  rows: 9, cols: 9, types: 7, shape: 'squircle', target: 10400, moves: 16 },
 ];
+
+/* Progress: index of the highest level the player may start (persisted). */
+const PROGRESS_KEY = 'xxl.unlocked';
+function getUnlocked() {
+  try {
+    const n = parseInt(localStorage.getItem(PROGRESS_KEY), 10);
+    return Number.isFinite(n) ? Math.min(Math.max(n, 0), LEVELS.length - 1) : 0;
+  } catch (e) { return 0; }
+}
+function unlockLevel(index) {
+  if (index <= getUnlocked()) return;
+  try { localStorage.setItem(PROGRESS_KEY, String(index)); } catch (e) {}
+}
 
 let currentEngine = null;
 let currentLevelIndex = 0;
@@ -628,16 +644,19 @@ let currentLevelIndex = 0;
 function renderLevelCards() {
   const wrap = document.getElementById('levelCards');
   wrap.innerHTML = '';
+  const unlocked = getUnlocked();
   LEVELS.forEach((lvl, i) => {
+    const locked = i > unlocked;
     const card = document.createElement('div');
-    card.className = 'levelCard';
-    card.innerHTML = `<h3>${lvl.name}</h3><p>Target ${lvl.target.toLocaleString()} pts &middot; ${lvl.moves} moves &middot; ${lvl.cols}&times;${lvl.rows} board &middot; ${lvl.types} colours</p>`;
-    card.addEventListener('click', () => startLevel(i));
+    card.className = 'levelCard' + (locked ? ' locked' : '');
+    card.innerHTML = `<h3>${locked ? '&#128274; ' : ''}${lvl.name}</h3><p>Target ${lvl.target.toLocaleString()} pts &middot; ${lvl.moves} moves &middot; ${lvl.cols}&times;${lvl.rows} board &middot; ${lvl.types} colours</p>`;
+    if (!locked) card.addEventListener('click', () => startLevel(i));
     wrap.appendChild(card);
   });
 }
 
 function startLevel(index) {
+  if (index > getUnlocked()) return; // must pass previous level first
   currentLevelIndex = index;
   const cfg = LEVELS[index];
   document.getElementById('levelSelect').style.display = 'none';
@@ -666,6 +685,7 @@ function startLevel(index) {
 }
 
 function showModal(result, score, cfg) {
+  if (result === 'WIN') unlockLevel(currentLevelIndex + 1);
   document.getElementById('modalOverlay').style.display = 'flex';
   document.getElementById('modalTitle').textContent = result === 'WIN' ? 'Level Complete!' : 'Out of Moves';
   document.getElementById('modalMsg').textContent =
@@ -681,6 +701,7 @@ document.getElementById('backBtn').addEventListener('click', () => {
   document.getElementById('hud').style.display = 'none';
   document.getElementById('boardWrap').style.display = 'none';
   document.getElementById('modalOverlay').style.display = 'none';
+  renderLevelCards();
   document.getElementById('levelSelect').style.display = 'flex';
 });
 
