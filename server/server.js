@@ -294,6 +294,40 @@ function createApp(opts = {}) {
         const drafts = db.prepare("SELECT COUNT(*) c FROM attempts WHERE status='draft'").get().c;
         return send(res, 200, { participants, submitted, drafts, distribution: dist });
       }
+      if (method === 'GET' && p === '/api/admin/report') {
+        const tz = Math.max(-840, Math.min(840, Number(url.searchParams.get('tz')) || 0)); // 客户端时区偏移（分钟，东区为正）
+        const rows = db.prepare('SELECT participant_id,status,scores,primary_anchors,started_at,submitted_at FROM attempts').all();
+        const done = rows.filter((r) => r.status === 'submitted');
+        const dayKey = (t) => new Date(t + tz * 60000).toISOString().slice(0, 10);
+        const primary = Object.fromEntries(ANCHOR_ORDER.map((c) => [c, 0]));
+        const sum = Object.fromEntries(ANCHOR_ORDER.map((c) => [c, 0]));
+        const perDay = {};
+        const mins = [];
+        const doneBy = new Map();
+        for (const r of done) {
+          for (const c of JSON.parse(r.primary_anchors)) primary[c]++;
+          const sc = JSON.parse(r.scores);
+          for (const c of ANCHOR_ORDER) sum[c] += sc[c];
+          const k = dayKey(r.submitted_at);
+          perDay[k] = (perDay[k] || 0) + 1;
+          mins.push((r.submitted_at - r.started_at) / 60000);
+          doneBy.set(r.participant_id, (doneBy.get(r.participant_id) || 0) + 1);
+        }
+        mins.sort((x, y) => x - y);
+        const days = [];
+        for (let i = 29; i >= 0; i--) { const k = dayKey(now() - i * 86400000); days.push({ date: k, count: perDay[k] || 0 }); }
+        const drafts = rows.length - done.length;
+        const avg = Object.fromEntries(ANCHOR_ORDER.map((c) => [c, done.length ? Math.round((sum[c] / done.length) * 10) / 10 : null]));
+        return send(res, 200, {
+          participants: db.prepare('SELECT COUNT(*) c FROM participants').get().c,
+          submitted: done.length, drafts,
+          completionRate: rows.length ? done.length / rows.length : null,
+          last7: days.slice(-7).reduce((a, d) => a + d.count, 0),
+          medianMinutes: mins.length ? Math.round(mins[Math.floor(mins.length / 2)] * 10) / 10 : null,
+          retakers: [...doneBy.values()].filter((n) => n > 1).length,
+          primary, avgScores: avg, days,
+        });
+      }
       if (method === 'GET' && p === '/api/admin/attempts/export.csv') {
         const rows = db.prepare('SELECT a.id,p.name,p.email,a.status,a.primary_anchors,a.scores,a.started_at,a.submitted_at FROM attempts a JOIN participants p ON p.id=a.participant_id ORDER BY a.id').all();
         const iso = (t) => (t ? new Date(t).toISOString() : '');
