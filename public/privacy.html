@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>隐私说明 - 职业锚测试</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+.legal{padding:26px 24px}.legal h1{margin:0 0 4px}.legal h2{font-size:1.1rem;margin:1.6em 0 .4em}
+.legal p,.legal li{line-height:1.8}.legal ul{padding-left:1.3em;margin:.3em 0}
+.legal table{margin:.6em 0;font-size:.92rem}.legal th{background:var(--bg)}
+.legal .meta{color:var(--muted);font-size:.9rem;margin:0 0 1em}.legal a{color:var(--brand)}
+.nav{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 12px;font-size:.92rem}.nav a{color:var(--brand);text-decoration:none}
+</style>
+</head>
+<body>
+<main class="wrap">
+<div class="nav"><a href="/">← 返回测试</a><a href="/privacy.html">隐私说明</a><a href="/terms.html">服务说明与退款</a></div>
+<article class="card legal">
+<h1>隐私说明</h1>
+<p class="meta">运营方：职业锚测试运营方　·　版本 1.0　·　更新日期：2026-10-24</p>
+<p>这份说明用大白话告诉你：我们收集什么、为什么收集、谁能看到、保存多久，以及你怎样查看和删除自己的数据。</p>
+
+<h2>1. 我们收集什么</h2>
+<table>
+<thead><tr><th>数据</th><th>用途</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>姓名（或昵称）</td><td>显示在你的报告上</td><td>你自己填写，可以用昵称</td></tr>
+<tr><td>邮箱</td><td>识别你是谁，方便你以后回看</td><td>我们<strong>不会</strong>向这个邮箱发送邮件，也不会验证它</td></tr>
+<tr><td>查看密钥</td><td>保护你的结果，只有你能回看</td><td>只保存加盐哈希，我们看不到明文；忘记后只能由运营方重置</td></tr>
+<tr><td>答题与结果</td><td>生成报告、让你回看</td><td>包括每题选择、各维度得分、主职业锚、答题时间</td></tr>
+<tr><td>兑换码使用记录</td><td>防止一个码被反复使用</td><td>记录哪个码、被谁、何时使用</td></tr>
+<tr><td>团队信息</td><td>仅当你使用团队码时</td><td>记录你属于哪个团队</td></tr>
+<tr><td>网络信息</td><td>防止滥用和暴力破解</td><td>只保存不可还原的 IP 哈希和浏览器类型，不保存明文 IP</td></tr>
+</tbody></table>
+<p>我们<strong>不收集</strong>手机号、身份证号、住址、定位、通讯录等信息，也没有使用任何第三方统计或广告脚本。</p>
+
+<h2>2. 谁能看到你的数据</h2>
+<ul>
+<li><strong>你本人</strong>：用邮箱 + 查看密钥可以随时回看自己的结果。</li>
+<li><strong>运营方（管理员）</strong>：为了提供服务、处理问题（如重置密钥、核对兑换码、删除数据）可以访问后台记录。</li>
+<li><strong>团队负责人</strong>（仅当你使用团队码）：默认<strong>只能看到整个团队的汇总统计</strong>，看不到你的姓名、答案和个人结果；团队完成人数不足 3 人时汇总也不显示。只有当运营方为该团队开启“负责人可看姓名”时，负责人才能看到你的<strong>姓名和主职业锚</strong>（不含邮箱和答案）。无论哪种情况，加入团队前你都会看到一页说明，同意后才会开始。</li>
+<li>我们不会出售、出租你的数据，也不会把它提供给广告商。</li>
+</ul>
+
+<h2>3. 保存多久</h2>
+<p>你的数据最长保存 <strong>12 个月</strong>（从你最近一次使用算起），到期后我们会删除。你也可以随时申请提前删除。</p>
+
+<h2>4. 你的权利：查看、更正、删除</h2>
+<ul>
+<li><strong>查看</strong>：用邮箱和查看密钥登录即可看到自己的全部测试记录。</li>
+<li><strong>删除或更正</strong>：通过你购买服务的渠道（闲鱼聊天）联系运营方，说明你的邮箱即可。我们会在 <strong>30 天内</strong>处理，删除会同时删除你的所有测试记录；已经保存在你自己设备或备份文件里的内容不受影响。</li>
+<li>为了保护你，处理申请前我们可能请你确认邮箱或购买信息。</li>
+</ul>
+
+<h2>5. 我们怎样保护数据</h2>
+<ul>
+<li>全程使用 HTTPS 加密传输。</li>
+<li>查看密钥以哈希保存；管理后台需要口令，并限制尝试次数。</li>
+<li>数据保存在服务器上的数据库中，定期做备份；备份同样仅限运营方使用。</li>
+<li>没有任何系统可以保证绝对安全。如发生可能影响你的数据安全事件，我们会通过购买渠道及时告知。</li>
+</ul>
+
+<h2>6. 备用版说明</h2>
+<p>网站上的“备用版”（matchgamers.com/career-anchor/）完全在你的浏览器里运行，答题数据只保存在你当前设备的浏览器中，不会上传到我们的服务器。清除浏览器数据后这些记录就没有了。</p>
+
+<h2>7. 未成年人</h2>
+<p>如果你未满 18 周岁，请在监护人同意下使用本服务。</p>
+
+<h2>8. 说明的变更</h2>
+<p>说明有重要变化时，会更新本页的版本号和日期。你继续使用即表示知晓更新后的说明。</p>
+
+<h2>9. 联系我们</h2>
+<p>通过你购买服务的渠道（闲鱼聊天）联系运营方。</p>
+</article>
+</main>
+</body>
+</html>

@@ -5,8 +5,9 @@
   let cfg, page = 1, q = '', status = '';
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = (t) => (t ? new Date(t).toLocaleString('zh-CN', { hour12: false }) : '');
-  async function api(method, path, raw) {
-    const res = await fetch(path, { method, headers: { Authorization: 'Bearer ' + pw } });
+  async function api(method, path, rawOrBody) { // 第三个参数：true 表示返回原始响应；对象表示请求体
+    const raw = rawOrBody === true, body = raw ? undefined : rawOrBody;
+    const res = await fetch(path, { method, headers: { Authorization: 'Bearer ' + pw, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
     if (raw && res.ok) return res;
     const d = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(d.error || '请求失败');
@@ -28,7 +29,9 @@
   }
   function draw(ls) {
     const A = cfg.anchors, pages = Math.max(1, Math.ceil(ls.total / ls.size));
-    app.innerHTML = `<div class="card"><h1>管理后台</h1><p class="muted">共 ${ls.total} 条记录。</p><div class="row"><a class="btnlink" href="/report.html">查看统计报表 →</a> <a class="btnlink" href="/codes.html">兑换码管理 →</a> <a class="btnlink" href="/teams.html">团队管理 →</a></div></div>
+    app.innerHTML = `<div class="card"><h1>管理后台</h1><p class="muted">共 ${ls.total} 条记录。</p><div class="row"><a class="btnlink" href="/report.html">查看统计报表 →</a> <a class="btnlink" href="/codes.html">兑换码管理 →</a> <a class="btnlink" href="/teams.html">团队管理 →</a></div>
+      <div class="row"><button type="button" class="ghost" id="bk">下载数据库备份</button><button type="button" class="ghost" id="pg">清理旧数据…</button><span id="mt" class="muted"></span></div>
+      <p class="muted small">建议每周下载一次备份并保存在自己的电脑或网盘；备份里的查看密钥只有哈希，不含登录会话。</p></div>
       <div class="card"><form id="s" class="row" style="margin:0"><input id="q" type="text" placeholder="搜索姓名或邮箱" value="${esc(q)}" style="max-width:260px">
         <select id="st" style="padding:10px;border-radius:10px"><option value="">全部状态</option><option value="submitted" ${status === 'submitted' ? 'selected' : ''}>已提交</option><option value="draft" ${status === 'draft' ? 'selected' : ''}>进行中</option></select>
         <button>搜索</button><button type="button" class="ghost" id="csv">导出 CSV</button><button type="button" class="ghost" id="out">退出</button></form>
@@ -42,6 +45,27 @@
     document.getElementById('pv').onclick = () => { page--; load(); };
     document.getElementById('nx').onclick = () => { page++; load(); };
     document.getElementById('out').onclick = () => { try { sessionStorage.removeItem('ca_admin'); } catch (e) { /* 忽略 */ } pw = ''; login(); };
+    const mt = document.getElementById('mt');
+    document.getElementById('bk').onclick = async () => {
+      mt.textContent = '正在生成备份…';
+      try {
+        const res = await api('GET', '/api/admin/backup', true);
+        const cd = res.headers.get('content-disposition') || '';
+        const a = document.createElement('a'); a.href = URL.createObjectURL(await res.blob()); a.download = (/filename="([^"]+)"/.exec(cd) || [])[1] || 'career-anchor.db'; a.click(); URL.revokeObjectURL(a.href);
+        mt.textContent = '备份已下载，请妥善保存';
+      } catch (er) { mt.textContent = er.message; }
+    };
+    document.getElementById('pg').onclick = async () => {
+      const m = prompt('清理多少个月没有任何活动的用户及其全部测试记录？（隐私说明承诺最长保存 12 个月）', '12');
+      if (m === null) return;
+      try {
+        const pv = await api('GET', `/api/admin/purge-preview?months=${encodeURIComponent(m)}`);
+        if (!pv.count) { mt.textContent = `没有超过 ${pv.months} 个月无活动的用户`; return; }
+        if (!confirm(`将永久删除 ${pv.count} 位超过 ${pv.months} 个月无活动的用户及其全部测试记录，无法恢复。建议先下载一份数据库备份。确定删除？`)) return;
+        const r = await api('POST', '/api/admin/purge', { months: pv.months });
+        mt.textContent = `已删除 ${r.deleted} 位用户`; load();
+      } catch (er) { mt.textContent = er.message; }
+    };
     document.getElementById('csv').onclick = async () => {
       const res = await api('GET', '/api/admin/attempts/export.csv', true);
       const a = document.createElement('a'); a.href = URL.createObjectURL(await res.blob()); a.download = 'career-anchor.csv'; a.click(); URL.revokeObjectURL(a.href);

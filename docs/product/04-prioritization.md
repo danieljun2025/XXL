@@ -32,7 +32,7 @@
 
 | # | 事项 | R | I | C | E(天) | RICE | 级别 | 闸门 |
 |---|---|---|---|---|---|---|---|---|
-| [#14](https://github.com/danieljun2025/XXL/issues/14) | Render 快照与备份恢复演练 | 100 | 3 | 90% | 0.5 | **540** | P0 | 数据安全 |
+| [#14](https://github.com/danieljun2025/XXL/issues/14) | 备份：自动快照确认 + 下载数据库备份 | 100 | 3 | 90% | 1 | **270** | P0 | 数据安全 |
 | [#15](https://github.com/danieljun2025/XXL/issues/15) | 启用兑换码：清单与首批码 | 100 | 2 | 80% | 0.5 | **320** | P0 | 收入阻塞 |
 | [#12](https://github.com/danieljun2025/XXL/issues/12) | 隐私说明页与删除流程 | 100 | 2 | 80% | 1 | **160** | P0 | 合规 |
 | [#13](https://github.com/danieljun2025/XXL/issues/13) | 服务说明与退款规则 | 100 | 1 | 80% | 0.5 | **160** | P0 | 合规 |
