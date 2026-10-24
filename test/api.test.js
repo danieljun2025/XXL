@@ -116,6 +116,19 @@ test('管理后台：口令保护、列表、统计、导出、重置密钥、�
   assert.equal((await call('POST', '/api/enter', { email: 'zhang@example.com', key: 'secret123' })).status, 401);
 });
 
+test('后台报表：汇总数据与权限', async () => {
+  assert.equal((await call('GET', '/api/admin/report')).status, 401);
+  const r = await call('GET', '/api/admin/report?tz=480', null, 'admin-pass');
+  assert.equal(r.status, 200);
+  assert.ok(r.body.submitted >= 20);
+  assert.equal(r.body.days.length, 30);
+  assert.equal(r.body.days.reduce((a, d) => a + d.count, 0), r.body.submitted);
+  assert.equal(Object.keys(r.body.primary).length, 8);
+  assert.ok(r.body.avgScores.TF >= 1 && r.body.avgScores.TF <= 8.4);
+  assert.ok(r.body.completionRate > 0 && r.body.completionRate <= 1);
+  assert.ok(!JSON.stringify(r.body).includes('@'));
+});
+
 test('静态资源与路径穿越', async () => {
   assert.equal((await call('GET', '/')).status, 200);
   assert.ok([403, 404].includes((await call('GET', '/%2e%2e/server/server.js')).status));

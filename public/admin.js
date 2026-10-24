@@ -22,15 +22,13 @@
   async function load() {
     try {
       cfg = cfg || await (await fetch('/api/config')).json();
-      const [st, ls] = await Promise.all([api('GET', '/api/admin/stats'), api('GET', `/api/admin/attempts?page=${page}&q=${encodeURIComponent(q)}&status=${status}`)]);
-      draw(st, ls);
+      const ls = await api('GET', `/api/admin/attempts?page=${page}&q=${encodeURIComponent(q)}&status=${status}`);
+      draw(ls);
     } catch (e) { login(e.message); }
   }
-  function draw(st, ls) {
+  function draw(ls) {
     const A = cfg.anchors, pages = Math.max(1, Math.ceil(ls.total / ls.size));
-    app.innerHTML = `<div class="card"><h1>管理后台</h1>
-      <div class="stats"><div><b>${st.participants}</b>测试者</div><div><b>${st.submitted}</b>已提交</div><div><b>${st.drafts}</b>进行中</div>
-      ${cfg.order.map((c) => `<div><b>${st.distribution[c]}</b>${esc(A[c].name)}</div>`).join('')}</div></div>
+    app.innerHTML = `<div class="card"><h1>管理后台</h1><p class="muted">共 ${ls.total} 条记录。</p><div class="row"><a class="btnlink" href="/report.html">查看统计报表 →</a></div></div>
       <div class="card"><form id="s" class="row" style="margin:0"><input id="q" type="text" placeholder="搜索姓名或邮箱" value="${esc(q)}" style="max-width:260px">
         <select id="st" style="padding:10px;border-radius:10px"><option value="">全部状态</option><option value="submitted" ${status === 'submitted' ? 'selected' : ''}>已提交</option><option value="draft" ${status === 'draft' ? 'selected' : ''}>进行中</option></select>
         <button>搜索</button><button type="button" class="ghost" id="csv">导出 CSV</button><button type="button" class="ghost" id="out">退出</button></form>
