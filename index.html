@@ -1,672 +1,612 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="zh-CN">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Match-3 MVP Prototype</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>职业锚测试</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
-    min-height: 100vh;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    font-family: 'Segoe UI', sans-serif; color: #fff; gap: 16px; padding: 20px;
-  }
-  h1 { font-size: 2rem; letter-spacing: 3px; text-shadow: 0 0 20px rgba(255,200,0,.8); }
-  /* ---------- Level Select ---------- */
-  #levelSelect { display: flex; flex-direction: column; align-items: center; gap: 14px; }
-  .levelCard {
-    width: 280px; padding: 16px 20px; background: rgba(255,255,255,.07);
-    border: 1px solid rgba(255,255,255,.2); border-radius: 14px; cursor: pointer;
-    transition: transform .15s, background .15s;
-  }
-  .levelCard:hover { transform: translateY(-3px); background: rgba(255,255,255,.13); }
-  .levelCard h3 { color: #ffd700; margin-bottom: 6px; }
-  .levelCard p { font-size: .85rem; opacity: .8; }
-  /* ---------- HUD ---------- */
-  #hud { display: none; flex-direction: column; align-items: center; gap: 8px; width: 420px; }
-  #hudRow { display: flex; justify-content: space-between; width: 100%; font-size: 1rem; }
-  #hudRow span strong { color: #ffd700; }
-  #progressOuter { width: 100%; height: 14px; background: rgba(255,255,255,.1); border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,.2); }
-  #progressInner { height: 100%; width: 0%; background: linear-gradient(90deg,#00c6ff,#0072ff); transition: width .3s ease; }
-  /* ---------- Board ---------- */
-  #boardWrap { display: none; }
-  #board {
-    position: relative;
-    display: grid; grid-template-columns: repeat(8, 48px); grid-template-rows: repeat(8, 48px);
-    gap: 4px; background: rgba(255,255,255,.05); padding: 10px; border-radius: 16px;
-    border: 1px solid rgba(255,255,255,.15); box-shadow: 0 8px 32px rgba(0,0,0,.4);
-  }
-  .tile {
-    position: absolute; width: 48px; height: 48px; border-radius: 10px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: bold;
-    transition: top .28s ease, left .28s ease, opacity .25s ease, transform .15s ease;
-    box-shadow: inset 0 0 6px rgba(0,0,0,.3);
-    user-select: none;
-  }
-  .tile.removing { opacity: 0; transform: scale(.3); }
-  .tile.selected { outline: 3px solid #fff; transform: scale(1.08); z-index: 5; }
-  .t1 { background: linear-gradient(145deg,#ff6b6b,#cc0000); }
-  .t2 { background: linear-gradient(145deg,#4dabf7,#0050b3); }
-  .t3 { background: linear-gradient(145deg,#69db7c,#1e7d22); }
-  .t4 { background: linear-gradient(145deg,#ffd43b,#e08e00); }
-  .t5 { background: linear-gradient(145deg,#cc5de8,#7d1aad); }
-  .special-lineH::after, .special-lineV::after { content:'\2194'; position:absolute; font-size:1.4rem; color:#fff; text-shadow:0 0 6px #000; }
-  .special-lineV::after { content:'\2195'; }
-  .special-bomb { box-shadow: 0 0 16px 4px #fff, inset 0 0 6px rgba(0,0,0,.3); }
-  .special-bomb::after { content:'\2605'; position:absolute; font-size:1.3rem; color:#fff; text-shadow:0 0 6px #000; }
-  /* ---------- Modal ---------- */
-  #modalOverlay {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6);
-    align-items: center; justify-content: center;
-  }
-  #modalBox {
-    background: #16213e; border: 1px solid rgba(255,255,255,.2); border-radius: 16px;
-    padding: 30px 40px; text-align: center; min-width: 260px;
-  }
-  #modalBox h2 { margin-bottom: 10px; }
-  #modalBox p { margin-bottom: 18px; opacity: .85; }
-  .modalBtn {
-    background: linear-gradient(135deg,#00c6ff,#0072ff); color: #fff; border: none;
-    padding: 10px 22px; border-radius: 10px; font-size: 1rem; cursor: pointer; margin: 0 6px;
-  }
-  .modalBtn.secondary { background: rgba(255,255,255,.15); }
-  #backBtn { background: none; border: 1px solid rgba(255,255,255,.3); color:#fff; padding:6px 14px; border-radius:8px; cursor:pointer; }
+:root{--bg:#f6f7f9;--card:#fff;--text:#1f2933;--muted:#667085;--line:#e4e7ec;--brand:#2f6fed;--brand-d:#1f55c4;--ok:#12805c;--err:#c0392b;--sel:#e8f0fe}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12151a;--card:#1b2028;--text:#e6e9ef;--muted:#9aa4b2;--line:#2c3440;--brand:#6c9bff;--brand-d:#8db0ff;--ok:#4cc29a;--err:#ff7b6b;--sel:#22314f;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12151a;--card:#1b2028;--text:#e6e9ef;--muted:#9aa4b2;--line:#2c3440;--brand:#6c9bff;--brand-d:#8db0ff;--ok:#4cc29a;--err:#ff7b6b;--sel:#22314f;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:20px 16px 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;margin:14px 0}
+h1{font-size:1.6rem;margin:.2em 0}h2{font-size:1.25rem;margin:.2em 0 .6em}h3{font-size:1.05rem;margin:1em 0 .3em}
+p{margin:.5em 0}.muted{color:var(--muted);font-size:.92rem}
+label{display:block;margin:14px 0 4px;font-weight:600}
+input[type=text],input[type=email],input[type=password]{width:100%;padding:11px 12px;font-size:1rem;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text)}
+input:focus-visible,button:focus-visible,.opt:focus-within{outline:3px solid var(--brand);outline-offset:1px}
+button{font:inherit;cursor:pointer;border:1px solid var(--brand);background:var(--brand);color:#fff;padding:10px 20px;border-radius:10px}
+button:hover{background:var(--brand-d)}button.ghost{background:transparent;color:var(--brand)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;align-items:center}
+.err{color:var(--err);margin-top:10px;min-height:1.4em}
+.tabs{display:flex;gap:6px;margin-bottom:6px}.tabs button{flex:1;background:transparent;color:var(--text);border-color:var(--line)}
+.tabs button[aria-pressed=true]{background:var(--brand);color:#fff;border-color:var(--brand)}
+.bar{height:8px;background:var(--line);border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:var(--brand);transition:width .25s}
+.q{padding:14px 0;border-top:1px solid var(--line)}.q:first-of-type{border-top:0}
+.q p{font-weight:600;margin:0 0 8px}
+.scale{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.opt{position:relative;text-align:center;border:1px solid var(--line);border-radius:10px;padding:9px 0;cursor:pointer;user-select:none}
+.opt input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.opt:has(input:checked){background:var(--brand);color:#fff;border-color:var(--brand)}
+.ends{display:flex;justify-content:space-between;font-size:.8rem;color:var(--muted);margin-top:4px}
+.pick{display:flex;gap:10px;padding:10px;border:1px solid var(--line);border-radius:10px;margin:8px 0;cursor:pointer}
+.pick:has(input:checked){background:var(--sel);border-color:var(--brand)}
+.badge{display:inline-block;background:var(--sel);color:var(--brand);padding:2px 10px;border-radius:99px;font-size:.85rem;margin-right:6px}
+.hero{border-left:6px solid var(--brand)}
+.tag-list{padding-left:1.2em;margin:.3em 0}
+table{width:100%;border-collapse:collapse}th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left}
+.score-bar{height:10px;background:var(--line);border-radius:6px;min-width:80px}.score-bar i{display:block;height:100%;border-radius:6px;background:var(--brand)}
+.radar{width:100%;max-width:420px;display:block;margin:0 auto}
+.radar text{fill:var(--text);font-size:12px}.radar .grid{fill:none;stroke:var(--line)}.radar .shape{fill:var(--brand);fill-opacity:.25;stroke:var(--brand);stroke-width:2}
+.hist li{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px 0;border-top:1px solid var(--line);list-style:none}
+.hist{padding:0;margin:0}
+@media (max-width:520px){.scale{gap:4px}.card{padding:16px}}
+@media print{body{background:#fff;color:#000}.noprint{display:none!important}.card{border:1px solid #ccc;break-inside:avoid}}
+
+.banner{background:var(--sel);border-bottom:1px solid var(--line);padding:8px 16px;font-size:.88rem;text-align:center}
 </style>
 </head>
 <body>
-
-<h1>MATCH-3 :: MVP</h1>
-
-<div id="levelSelect">
-  <p style="opacity:.7;font-size:.85rem;">Select a level</p>
-  <div id="levelCards"></div>
-</div>
-
-<div id="hud">
-  <button id="backBtn">&larr; Levels</button>
-  <div id="hudRow">
-    <span>Moves: <strong id="movesVal">0</strong></span>
-    <span>Score: <strong id="scoreVal">0</strong></span>
-    <span>Target: <strong id="targetVal">0</strong></span>
-  </div>
-  <div id="progressOuter"><div id="progressInner"></div></div>
-</div>
-
-<div id="boardWrap"><div id="board"></div></div>
-
-<div id="modalOverlay">
-  <div id="modalBox">
-    <h2 id="modalTitle"></h2>
-    <p id="modalMsg"></p>
-    <button class="modalBtn secondary" id="modalReplay">Replay</button>
-    <button class="modalBtn" id="modalNext">Next Level</button>
-  </div>
-</div>
-
+<div class="banner noprint">你的答题数据只保存在当前设备的浏览器中，不会上传到任何服务器。</div>
+<main id="app" class="wrap" aria-live="polite"></main>
 <script>
-/* =========================================================================
-   GAME CORE ENGINE
-   Pure state + logic module. Holds the single source of truth for the grid.
-   Knows NOTHING about the DOM. Communicates outward only via emit()/log().
-   This separation guarantees the authoritative grid array can never be
-   desynchronized by a rendering glitch: the renderer only ever *reads*
-   engine.grid and *requests* animation handshakes, it never mutates state.
-   ========================================================================= */
-class GameEngine {
-  constructor(levelConfig) {
-    this.rows = 8;
-    this.cols = 8;
-    this.config = levelConfig;          // { target, moves }
-    this.grid = [];                     // grid[r][c] = {id, type, special, state} | null
-    this.state = 'INIT';                // IDLE | SWAP | MATCH_DETECTION | ELIMINATING | FALLING | GAME_OVER
-    this.score = 0;
-    this.movesLeft = levelConfig.moves;
-    this.combo = 0;
-    this._idSeq = 1;
-    this.listeners = {};
+(function () {
+const QUESTIONS = [
+  {"id": 1, "anchor": "TF", "text": "我最看重的是在自己擅长的专业领域里不断做得更精、更深。"},
+  {"id": 2, "anchor": "TF", "text": "如果必须在升任管理者和继续做专业工作之间选择，我宁愿留在专业岗位上。"},
+  {"id": 3, "anchor": "TF", "text": "被同行认可为某个领域的专家，会带给我最大的成就感。"},
+  {"id": 4, "anchor": "TF", "text": "我希望工作能持续运用并发展我的专业技能。"},
+  {"id": 5, "anchor": "TF", "text": "我不愿意接受会让我远离专业核心工作的职位调动。"},
+  {"id": 6, "anchor": "GM", "text": "我希望有一天能成为组织的高层负责人，对整体成果负责。"},
+  {"id": 7, "anchor": "GM", "text": "协调不同的人和部门朝同一个目标前进，让我很有成就感。"},
+  {"id": 8, "anchor": "GM", "text": "我愿意承担更大的责任，哪怕这意味着要做艰难的决策。"},
+  {"id": 9, "anchor": "GM", "text": "我认为职业成功的标志，是晋升到能够影响全局的位置。"},
+  {"id": 10, "anchor": "GM", "text": "相比钻研某项技术细节，我更喜欢分析全局并整合各方资源。"},
+  {"id": 11, "anchor": "AU", "text": "我希望自己能决定工作的内容、节奏和方式，少受规章制度约束。"},
+  {"id": 12, "anchor": "AU", "text": "我宁愿放弃一个高薪机会，也不愿失去工作中的自主权。"},
+  {"id": 13, "anchor": "AU", "text": "在被严格监督、反复要求汇报的环境里，我很难发挥出最好的水平。"},
+  {"id": 14, "anchor": "AU", "text": "我更喜欢按自己的标准和方法完成任务，而不是遵循固定流程。"},
+  {"id": 15, "anchor": "AU", "text": "能自由安排工作的时间和地点，对我来说比头衔更重要。"},
+  {"id": 16, "anchor": "SE", "text": "工作稳定、长期有保障，对我来说非常重要。"},
+  {"id": 17, "anchor": "SE", "text": "为了一份稳定的工作，我可以接受相对平缓的发展速度。"},
+  {"id": 18, "anchor": "SE", "text": "我希望所在的组织可靠、可预期，让我能放心地规划未来。"},
+  {"id": 19, "anchor": "SE", "text": "良好的福利、保障和工作的持续性，是我选择工作的重要标准。"},
+  {"id": 20, "anchor": "SE", "text": "相比充满变数的机会，我更愿意选择风险小、可预测的路径。"},
+  {"id": 21, "anchor": "EC", "text": "我渴望创办属于自己的企业，或开创一项全新的事业。"},
+  {"id": 22, "anchor": "EC", "text": "我享受把一个新点子变成现实的产品、服务或组织的过程。"},
+  {"id": 23, "anchor": "EC", "text": "为了实现自己的构想，我愿意承担相当大的风险。"},
+  {"id": 24, "anchor": "EC", "text": "为别人打工让我觉得受限，我更想打造完全属于自己的东西。"},
+  {"id": 25, "anchor": "EC", "text": "能留下一份由我亲手创造的成果，是我心中职业成功的核心。"},
+  {"id": 26, "anchor": "SV", "text": "我希望自己的工作能让世界变得更好、帮助到他人。"},
+  {"id": 27, "anchor": "SV", "text": "即使收入较低，只要工作符合我的价值观，我也愿意去做。"},
+  {"id": 28, "anchor": "SV", "text": "所做的事对社会或他人有意义，会让我深受激励。"},
+  {"id": 29, "anchor": "SV", "text": "我想选择能体现我所信奉理念的职业或组织。"},
+  {"id": 30, "anchor": "SV", "text": "如果现有工作与我的价值观冲突，我会认真考虑转行。"},
+  {"id": 31, "anchor": "CH", "text": "我喜欢去解决看起来几乎无法解决的难题。"},
+  {"id": 32, "anchor": "CH", "text": "任务越困难、竞争越激烈，越能激发我的斗志。"},
+  {"id": 33, "anchor": "CH", "text": "日常重复的工作很快就让我厌倦，我需要不断面对新的挑战。"},
+  {"id": 34, "anchor": "CH", "text": "战胜强劲的对手或克服巨大的障碍，是我心中职业成功的标志。"},
+  {"id": 35, "anchor": "CH", "text": "我希望工作始终能考验我、推着我突破自己的极限。"},
+  {"id": 36, "anchor": "LS", "text": "我希望工作与家庭、个人生活之间能保持良好的平衡。"},
+  {"id": 37, "anchor": "LS", "text": "我宁愿拒绝一个会严重占用私人时间的晋升机会。"},
+  {"id": 38, "anchor": "LS", "text": "对我来说，职业成功意味着生活的各个方面都能协调安排好。"},
+  {"id": 39, "anchor": "LS", "text": "我希望所在的组织能理解并尊重我的家庭与个人需求。"},
+  {"id": 40, "anchor": "LS", "text": "选择工作的地点和任务时，我会优先考虑能否兼顾个人生活。"}
+]
+;
+const ANCHORS = {
+  "TF": {
+    "name": "技术/职能型", "en": "Technical/Functional Competence",
+    "definition": "以在某一专业领域内的精深能力和卓越表现为职业核心。",
+    "motivation": "不断精进专业、成为领域内被信赖的专家。",
+    "strengths": ["专业深度强，对质量要求高", "愿意长期投入学习与钻研", "容易在专业圈内建立口碑"],
+    "blindspots": ["可能忽视对全局和人际协作的投入", "对偏离专业的事务耐心不足", "容易把专业标准强加给他人"],
+    "fit": ["有清晰专业通道的组织（如专家/资深工程师序列）", "鼓励深耕与持续学习的团队", "研发、分析、设计、咨询等岗位"],
+    "avoid": ["被迫长期从事与专业无关的行政或管理事务"],
+    "advice": ["争取专业序列的晋升通道，而非只有管理通道", "有意识地练习向非专业人士讲清价值", "通过带教与分享，把个人专长沉淀为团队能力"]
+  },
+  "GM": {
+    "name": "管理型", "en": "General Managerial Competence",
+    "definition": "以带领团队、整合资源并对整体成果负责为职业核心。",
+    "motivation": "晋升到更高的管理岗位，拥有影响全局的权责。",
+    "strengths": ["善于统筹、协调与决策", "能在不确定中承担责任", "关注结果并善于调动他人"],
+    "blindspots": ["可能对细节与专业深度投入不足", "过度追求职位与控制感", "在没有权限的情境中容易感到挫败"],
+    "fit": ["层级清晰、晋升路径明确的组织", "需要跨部门协作的综合性岗位", "项目负责人、部门管理、运营管理等"],
+    "avoid": ["长期做缺乏影响力和决策权的执行工作"],
+    "advice": ["尽早争取带项目、带人的机会积累管理经验", "补齐财务、战略与人员管理的基础能力", "保持对业务本质的理解，避免只做'传话人'"]
+  },
+  "AU": {
+    "name": "自主/独立型", "en": "Autonomy/Independence",
+    "definition": "以按自己的方式、节奏和标准工作的自由为职业核心。",
+    "motivation": "摆脱过多规则与束缚，自己掌控工作的方式。",
+    "strengths": ["自驱力强，能独立完成任务", "对自己的工作成果负责", "不依赖外部监督也能保持产出"],
+    "blindspots": ["团队协作与服从安排时可能不适", "可能因追求自由而错过稳定的发展机会", "容易被认为不够合群"],
+    "fit": ["弹性工作、结果导向的环境", "自由职业、顾问、独立研究、远程岗位", "给予明确边界内充分授权的团队"],
+    "avoid": ["流程繁琐、监督密集、事事需要审批的环境"],
+    "advice": ["寻找或争取结果导向的考核方式", "主动沟通进度，减少他人对'失控'的担忧", "为收入与发展的不确定性准备应对方案"]
+  },
+  "SE": {
+    "name": "安全/稳定型", "en": "Security/Stability",
+    "definition": "以工作与生活的稳定、可预期和长期保障为职业核心。",
+    "motivation": "拥有可靠的收入、福利和长期的职业安全感。",
+    "strengths": ["可靠、守信、执行力强", "对组织忠诚，能长期投入", "善于在既定框架内把事情做稳"],
+    "blindspots": ["面对变化和风险时可能过度保守", "可能为了安稳而压抑自己的潜力", "对组织变动容易产生焦虑"],
+    "fit": ["发展成熟、制度完善的组织", "有长期雇佣和清晰福利体系的单位", "运营、财务、行政、合规等稳定岗位"],
+    "avoid": ["频繁调整、前景高度不确定的环境"],
+    "advice": ["把'稳定'建立在可迁移的能力上，而不只依赖单一雇主", "在可控范围内尝试小幅变化，培养对不确定的耐受力", "定期评估所处行业和岗位的长期前景"]
+  },
+  "EC": {
+    "name": "创业/创造型", "en": "Entrepreneurial Creativity",
+    "definition": "以创建属于自己的事业、产品或组织为职业核心。",
+    "motivation": "把想法变成现实，并亲手创造出有价值的成果。",
+    "strengths": ["创意丰富，敢于冒险与尝试", "资源整合与机会捕捉能力强", "面对挫折的恢复力强"],
+    "blindspots": ["可能缺乏耐心做长期、重复的运营", "容易过早转向新点子而难以收尾", "对风险与资金的判断可能偏乐观"],
+    "fit": ["初创公司、新业务孵化、内部创业项目", "产品、市场拓展、创新类岗位", "赋予创造空间和所有权的环境"],
+    "avoid": ["高度程序化、不允许尝试新做法的环境"],
+    "advice": ["先用小规模试验验证想法，再逐步加大投入", "寻找能补足运营与财务短板的合作伙伴", "为创业设定止损线，保留基本的现金与退路"]
+  },
+  "SV": {
+    "name": "服务/奉献型", "en": "Service/Dedication to a Cause",
+    "definition": "以实现个人价值观、帮助他人和改善社会为职业核心。",
+    "motivation": "让工作承载意义，为所信奉的事业做出贡献。",
+    "strengths": ["使命感强，能带动周围的人", "同理心与沟通能力突出", "为认同的事业愿意长期付出"],
+    "blindspots": ["可能因理想受挫而产生强烈失落", "容易忽略自身的回报与边界", "对价值观不同的人可能缺乏弹性"],
+    "fit": ["公益、教育、医疗、社会企业等", "价值观明确、重视社会影响的组织", "人力发展、客户成功、咨询辅导类岗位"],
+    "avoid": ["工作内容与自身价值观长期冲突的环境"],
+    "advice": ["明确自己真正在乎的价值，再选择承载它的平台", "为自己设置边界，避免长期透支", "用具体成果衡量影响力，让付出可见、可持续"]
+  },
+  "CH": {
+    "name": "挑战型", "en": "Pure Challenge",
+    "definition": "以征服看似不可能的难题、战胜强大对手为职业核心。",
+    "motivation": "不断突破极限，在高难度的任务中证明自己。",
+    "strengths": ["斗志旺盛，抗压能力强", "擅长攻坚与解决复杂问题", "目标感强，不轻易放弃"],
+    "blindspots": ["缺少挑战时容易倦怠", "可能忽视团队节奏与他人感受", "有时为了'赢'而忽略长期成本"],
+    "fit": ["高强度、竞争激烈的行业与项目", "战略咨询、投行、危机处理、攻坚型项目", "能持续给予新难题的岗位"],
+    "avoid": ["长期稳定、缺乏变化与竞争的重复性工作"],
+    "advice": ["为自己规划阶段性的新挑战，防止倦怠", "留意团队成员的承受力，学会分享成就", "给自己留出恢复时间，保持长跑能力"]
+  },
+  "LS": {
+    "name": "生活方式型", "en": "Lifestyle",
+    "definition": "以工作、家庭与个人生活的整体平衡与融合为职业核心。",
+    "motivation": "让事业服务于理想的生活，而不是相反。",
+    "strengths": ["善于统筹多重角色与时间", "关注可持续性，不易过度消耗", "对团队氛围与人情温度敏感"],
+    "blindspots": ["可能因优先照顾生活而放弃部分发展机会", "在高强度阶段容易产生抵触", "他人可能误解为缺乏进取心"],
+    "fit": ["重视弹性与员工福祉的组织", "工作边界清晰、可远程或弹性安排的岗位", "能与个人生活阶段相适配的角色"],
+    "avoid": ["长期加班、频繁出差、边界模糊的高压环境"],
+    "advice": ["明确自己在不同人生阶段对'平衡'的具体定义", "主动沟通并争取弹性安排，用成果换取信任", "在非高峰期投资能力，为之后的选择留足空间"]
   }
+}
+;
 
-  /* ---- tiny pub/sub so the renderer can react without the engine
-     needing to know what (or whether) anything is listening ---- */
-  on(event, cb) { (this.listeners[event] ??= []).push(cb); return this; }
-  emit(event, data) {
-    console.log(`[State]: ${event}`, data ?? '');
-    (this.listeners[event] || []).forEach(cb => cb(data));
+
+const ANCHOR_ORDER = ['TF', 'GM', 'AU', 'SE', 'EC', 'SV', 'CH', 'LS'];
+const ITEMS_PER_ANCHOR = 5;
+const BONUS = 4;
+
+// 可复现的伪随机数（mulberry32）
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffleIds(ids, seed) {
+  const out = ids.slice();
+  const rand = rng(seed);
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
   }
+  return out;
+}
 
-  /* Returns a promise that resolves once the renderer calls done().
-     A safety timeout guarantees the engine never hangs forever even
-     if the UI layer fails to ack (defensive prototype behaviour). */
-  requestRender(event, data) {
-    return new Promise(resolve => {
-      let settled = false;
-      const done = () => { if (!settled) { settled = true; resolve(); } };
-      const timeout = setTimeout(done, 1500);
-      this.emit(event, { ...data, done: () => { clearTimeout(timeout); done(); } });
+/**
+ * questions: [{id, anchor}]；answers: {id: 1..6}；picks: 最认同的题号（可为空）
+ * 每个维度：(5 题得分之和 + 4 × 被选中题数) / 5。
+ * 主职业锚：得分最高者；并列则全部列出；唯一最高时，若第二名仅低 1 个原始分（0.2）以内，也一并列出。
+ */
+function score(questions, answers, picks = []) {
+  const byId = new Map(questions.map((q) => [q.id, q]));
+  const raw = Object.fromEntries(ANCHOR_ORDER.map((a) => [a, 0]));
+  for (const q of questions) {
+    const v = answers[q.id];
+    if (!Number.isInteger(v) || v < 1 || v > 6) throw new Error(`题 ${q.id} 缺少有效答案`);
+    raw[q.anchor] += v;
+  }
+  const uniq = new Set(picks);
+  if (uniq.size !== picks.length) throw new Error('最认同的题目不能重复');
+  for (const id of uniq) {
+    if (!byId.has(id)) throw new Error(`无效的题号 ${id}`);
+    raw[byId.get(id).anchor] += BONUS;
+  }
+  const scores = {};
+  for (const a of ANCHOR_ORDER) scores[a] = Math.round((raw[a] / ITEMS_PER_ANCHOR) * 10) / 10;
+  const ranking = ANCHOR_ORDER.slice().sort((x, y) => raw[y] - raw[x] || ANCHOR_ORDER.indexOf(x) - ANCHOR_ORDER.indexOf(y));
+  const max = raw[ranking[0]];
+  let primary = ranking.filter((a) => raw[a] === max);
+  if (primary.length === 1 && max - raw[ranking[1]] <= 1) primary = [ranking[0], ranking[1]];
+  return { raw, scores, ranking, primary };
+}
+
+
+
+'use strict';
+// 纯前端版本的"假后端"：在浏览器内实现 /api/*，数据存在 localStorage。
+// 依赖构建时注入的 QUESTIONS、ANCHORS、ANCHOR_ORDER、shuffleIds、score。
+const CFG = { top3Bonus: true, pageSize: 5 };
+const DB_KEY='ca_preview_db_v1';
+let mem={users:{},nextId:1};
+const load=()=>{try{const s=localStorage.getItem(DB_KEY);if(s)return JSON.parse(s)}catch(e){}return mem};
+const save=(d)=>{mem=d;try{localStorage.setItem(DB_KEY,JSON.stringify(d))}catch(e){}};
+const qById=new Map(QUESTIONS.map(q=>[q.id,q]));
+const reply=(status,body)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
+const summary=(a)=>({id:a.id,status:a.status,startedAt:a.startedAt,submittedAt:a.submittedAt,primary:a.primary||null});
+const reportNo=(a)=>'CA-'+new Date(a.submittedAt||a.startedAt).toISOString().slice(0,10).replace(/-/g,'')+'-'+String(a.id).padStart(6,'0');
+function view(a,u){
+  const v={id:a.id,status:a.status,name:u.name,reportNo:reportNo(a),config:CFG};
+  if(a.status==='draft'){v.questions=a.order.map(id=>({id,text:qById.get(id).text}));v.answers=a.answers}
+  else{v.submittedAt=a.submittedAt;v.scores=a.scores;v.primary=a.primary;v.ranking=ANCHOR_ORDER.slice().sort((x,y)=>a.scores[y]-a.scores[x]||ANCHOR_ORDER.indexOf(x)-ANCHOR_ORDER.indexOf(y))}
+  return v;
+}
+async function handle(method,path,headers,body){
+  if(path==='/api/config')return reply(200,{...CFG,anchors:ANCHORS,order:ANCHOR_ORDER});
+  const db=load();
+  if(path==='/api/enter'){
+    const name=String(body.name||'').trim();
+    if(!name||name.length>30)return reply(400,{error:'请输入姓名（1–30 个字）'});
+    const norm=name.toLowerCase();let u=db.users[norm],isNew=!u;
+    if(!u)u=db.users[norm]={name,attempts:[]};
+    save(db);
+    return reply(200,{token:'demo:'+norm,isNew,name:u.name,attempts:u.attempts.slice().reverse().map(summary)});
+  }
+  const tk=/^Bearer demo:(.+)$/.exec(headers.Authorization||'');
+  const u=tk&&db.users[tk[1]];
+  if(!u)return reply(401,{error:'请先验证身份'});
+  if(path==='/api/logout')return reply(200,{ok:true});
+  if(path==='/api/me')return reply(200,{name:u.name,attempts:u.attempts.slice().reverse().map(summary)});
+  if(method==='POST'&&path==='/api/attempts'){
+    let a=u.attempts.find(x=>x.status==='draft');
+    if(!a){const seed=Math.floor(Math.random()*2147483646)+1;a={id:db.nextId++,status:'draft',seed,order:shuffleIds(QUESTIONS.map(q=>q.id),seed),answers:{},startedAt:Date.now()};u.attempts.push(a);save(db)}
+    return reply(200,view(a,u));
+  }
+  const m=/^\/api\/attempts\/(\d+)(?:\/(answers|submit))?$/.exec(path);
+  const a=m&&u.attempts.find(x=>x.id===Number(m[1]));
+  if(!a)return reply(404,{error:'记录不存在'});
+  if(method==='GET')return reply(200,view(a,u));
+  if(a.status!=='draft')return reply(409,{error:'该测试已提交'});
+  if(m[2]==='answers'){Object.assign(a.answers,body.answers||{});save(db);return reply(200,{saved:Object.keys(a.answers).length})}
+  if(m[2]==='submit'){
+    const picks=(body.picks||[]).map(Number);
+    if(picks.length!==3)return reply(400,{error:'请选出 3 道最认同的题目'});
+    let r;try{r=score(QUESTIONS,a.answers,picks)}catch(e){return reply(400,{error:e.message})}
+    Object.assign(a,{status:'submitted',top3:picks,scores:r.scores,primary:r.primary,submittedAt:Date.now()});save(db);
+    return reply(200,view(a,u));
+  }
+  return reply(404,{error:'接口不存在'});
+}
+const realFetch=window.fetch.bind(window);
+window.fetch=(url,opts={})=>{
+  if(typeof url==='string'&&url.startsWith('/api/'))return handle((opts.method||'GET').toUpperCase(),url,opts.headers||{},opts.body?JSON.parse(opts.body):{});
+  return realFetch(url,opts);
+};
+
+})();
+</script>
+<script>
+window.CA_STATIC = true;
+'use strict';
+(function () {
+  const app = document.getElementById('app');
+  const S = { token: null, name: '', attempts: [], cfg: null, att: null, page: 0, picks: [], mode: 'new' };
+  try { S.token = sessionStorage.getItem('ca_token'); } catch (e) { /* 忽略 */ }
+
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fmt = (t) => new Date(t).toLocaleString('zh-CN', { hour12: false });
+  const $ = (sel) => app.querySelector(sel);
+
+  async function api(method, path, body) {
+    const res = await fetch(path, { method, headers: { 'Content-Type': 'application/json', ...(S.token ? { Authorization: 'Bearer ' + S.token } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401 && S.token && path !== '/api/enter') { setToken(null); render(); throw new Error(data.error || '登录已过期'); }
+    if (!res.ok) throw new Error(data.error || '请求失败');
+    return data;
+  }
+  function setToken(t) { S.token = t; try { t ? sessionStorage.setItem('ca_token', t) : sessionStorage.removeItem('ca_token'); } catch (e) { /* 忽略 */ } }
+  const view = (html) => { app.innerHTML = html; window.scrollTo(0, 0); const h = app.querySelector('h1,h2'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } };
+
+  // ---------- 入口 ----------
+  function renderEnter(msg) {
+    if (window.CA_STATIC) {
+      view(`<div class="card"><h1>职业锚测试</h1>
+        <p class="muted">共 40 题，约 10 分钟。完成后立即生成你的职业锚报告，报告上会显示你的名字，并可保存为图片。</p>
+        <form id="f" autocomplete="off"><label for="name">你的名字</label><input id="name" type="text" maxlength="30" required>
+        <div class="err" id="err" role="alert">${esc(msg || '')}</div>
+        <div class="row"><button type="submit">开始测试</button></div></form></div>`);
+      $('#f').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type=submit]'); btn.disabled = true;
+        try {
+          const r = await api('POST', '/api/enter', { name: $('#name').value });
+          setToken(r.token); S.name = r.name; S.attempts = r.attempts;
+          await afterLogin();
+        } catch (er) { btn.disabled = false; $('#err').textContent = er.message; }
+      });
+      return;
+    }
+    const isNew = S.mode === 'new';
+    view(`<div class="card">
+      <h1>职业锚测试</h1>
+      <p class="muted">共 40 题，约 10 分钟。完成后立即获得你的职业锚报告，结果会保存，之后可凭「邮箱 + 查看密钥」再次查看。</p>
+      <div class="tabs" role="group" aria-label="身份">
+        <button type="button" data-mode="new" aria-pressed="${isNew}">首次测试</button>
+        <button type="button" data-mode="back" aria-pressed="${!isNew}">我已有记录</button>
+      </div>
+      <form id="f" autocomplete="off">
+        ${isNew ? '<label for="name">姓名</label><input id="name" type="text" maxlength="30" required>' : ''}
+        <label for="email">邮箱</label><input id="email" type="email" maxlength="120" required>
+        <label for="key">查看密钥</label><input id="key" type="password" minlength="6" maxlength="32" required autocomplete="new-password">
+        ${isNew ? '<label for="key2">再次输入查看密钥</label><input id="key2" type="password" minlength="6" maxlength="32" required autocomplete="new-password"><p class="muted">密钥 6–32 位，用于以后查看结果。系统不会发邮件，忘记后需联系管理员重置，请牢记。</p>' : '<p class="muted">忘记密钥？请联系管理员重置。</p>'}
+        <div class="err" id="err" role="alert">${esc(msg || '')}</div>
+        <div class="row"><button type="submit">${isNew ? '开始测试' : '进入'}</button></div>
+      </form></div>`);
+    app.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { S.mode = b.dataset.mode; renderEnter(); }));
+    $('#f').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const key = $('#key').value;
+      if (isNew && key !== $('#key2').value) return ($('#err').textContent = '两次输入的密钥不一致');
+      const btn = e.target.querySelector('button[type=submit]'); btn.disabled = true;
+      try {
+        const r = await api('POST', '/api/enter', { name: isNew ? $('#name').value : undefined, email: $('#email').value, key });
+        setToken(r.token); S.name = r.name; S.attempts = r.attempts;
+        await afterLogin();
+      } catch (er) { btn.disabled = false; $('#err').textContent = er.message; }
     });
   }
 
-  cloneGrid() {
-    return this.grid.map(row => row.map(t => t ? { ...t } : null));
+  async function afterLogin() {
+    if (!S.cfg) S.cfg = await api('GET', '/api/config');
+    const draft = S.attempts.find((a) => a.status === 'draft');
+    if (!S.attempts.length || (S.attempts.length === 1 && draft)) return startOrResume();
+    renderHome();
   }
 
-  randomType() { return 1 + Math.floor(Math.random() * 5); }
-
-  newTile(type) { return { id: this._idSeq++, type, special: null, state: 'idle' }; }
-
-  /* ---------------- INITIALIZATION / DEADLOCK PREVENTION ---------------- */
-  init() {
-    this.grid = this.generateValidBoard();
-    this.state = 'IDLE';
-    this.emit('init', { grid: this.cloneGrid() });
+  function renderHome() {
+    const hasDraft = S.attempts.some((a) => a.status === 'draft');
+    view(`<div class="card"><h1>你好，${esc(S.name)}</h1><p class="muted">你的测试记录：</p>
+      <ul class="hist">${S.attempts.map((a) => `<li><span>${a.status === 'submitted' ? `已完成 · ${fmt(a.submittedAt)} ${(a.primary || []).map((c) => `<span class="badge">${esc(S.cfg.anchors[c].name)}</span>`).join('')}` : `未完成 · 开始于 ${fmt(a.startedAt)}`}</span>
+        <button class="ghost" data-open="${a.id}">${a.status === 'submitted' ? '查看结果' : '继续作答'}</button></li>`).join('')}</ul>
+      <div class="row">${hasDraft ? '' : '<button id="again">重新测试</button>'}<button class="ghost" id="out">退出</button></div></div>`);
+    app.querySelectorAll('[data-open]').forEach((b) => b.addEventListener('click', () => openAttempt(Number(b.dataset.open))));
+    const again = $('#again'); if (again) again.addEventListener('click', startOrResume);
+    $('#out').addEventListener('click', logout);
   }
 
-  generateValidBoard() {
-    let attempts = 0;
-    let grid;
-    do {
-      grid = [];
-      for (let r = 0; r < this.rows; r++) {
-        const row = [];
-        for (let c = 0; c < this.cols; c++) {
-          // avoid trivially seeding an immediate match while filling
-          let type;
-          let tries = 0;
-          do {
-            type = this.randomType();
-            tries++;
-          } while (
-            tries < 10 && (
-              (c >= 2 && row[c - 1]?.type === type && row[c - 2]?.type === type) ||
-              (r >= 2 && grid[r - 1][c]?.type === type && grid[r - 2][c]?.type === type)
-            )
-          );
-          row.push(this.newTile(type));
-        }
-        grid.push(row);
-      }
-      attempts++;
-    } while ((this.findMatches(grid).length > 0 || !this.hasValidMove(grid)) && attempts < 200);
+  async function logout() { try { await api('POST', '/api/logout'); } catch (e) { /* 忽略 */ } setToken(null); S.att = null; S.mode = 'back'; renderEnter(); }
 
-    if (attempts >= 200) {
-      console.log('[State]: DEADLOCK_FALLBACK - forcing a guaranteed move');
-      grid[0][0].type = grid[0][1].type; // brute-force guarantee at least one move
-    }
-    return grid;
+  async function startOrResume() { S.att = await api('POST', '/api/attempts'); S.page = firstUnanswered(); S.picks = []; renderQuiz(); }
+  async function openAttempt(id) {
+    S.att = await api('GET', '/api/attempts/' + id);
+    if (S.att.status === 'submitted') return renderResult(S.att);
+    S.page = firstUnanswered(); S.picks = []; renderQuiz();
+  }
+  const pageSize = () => Math.max(1, Number(S.att.config.pageSize) || 5);
+  function firstUnanswered() {
+    const i = S.att.questions.findIndex((q) => !S.att.answers[q.id]);
+    return i < 0 ? Math.floor((S.att.questions.length - 1) / pageSize()) : Math.floor(i / pageSize());
   }
 
-  hasValidMove(grid) {
-    for (let r = 0; r < this.rows; r++) {
-      for (let c = 0; c < this.cols; c++) {
-        if (c + 1 < this.cols && this._swapCreatesMatch(grid, r, c, r, c + 1)) return true;
-        if (r + 1 < this.rows && this._swapCreatesMatch(grid, r, c, r + 1, c)) return true;
-      }
-    }
-    return false;
+  // ---------- 答题 ----------
+  let saveTimer = null; const dirty = {};
+  async function flush() {
+    clearTimeout(saveTimer);
+    const answers = { ...dirty }; if (!Object.keys(answers).length) return;
+    for (const k in dirty) delete dirty[k];
+    try { await api('PUT', `/api/attempts/${S.att.id}/answers`, { answers }); }
+    catch (e) { Object.assign(dirty, answers); throw e; }
   }
 
-  _swapCreatesMatch(grid, r1, c1, r2, c2) {
-    const a = grid[r1][c1], b = grid[r2][c2];
-    grid[r1][c1] = b; grid[r2][c2] = a;
-    const found = this.findMatches(grid).length > 0;
-    grid[r1][c1] = a; grid[r2][c2] = b;
-    return found;
-  }
-
-  /* ---------------- STATE MACHINE: PLAYER INPUT ---------------- */
-  async trySwap(r1, c1, r2, c2) {
-    if (this.state !== 'IDLE') return;
-    if (!this._isAdjacent(r1, c1, r2, c2)) return;
-
-    this.state = 'SWAP';
-    this.emit('stateChange', { state: this.state });
-    this._swapCells(r1, c1, r2, c2);
-    await this.requestRender('swap', { a: [r1, c1], b: [r2, c2] });
-
-    const matches = this.findMatches();
-    if (matches.length === 0) {
-      this.emit('revertSwap', { a: [r1, c1], b: [r2, c2] });
-      this._swapCells(r1, c1, r2, c2); // swap back
-      await this.requestRender('renderSync', { grid: this.cloneGrid() });
-      this.state = 'IDLE';
-      this.emit('stateChange', { state: this.state });
-      return;
-    }
-
-    // valid move: consumes one move from the turn-based economy
-    this.movesLeft = Math.max(0, this.movesLeft - 1);
-    this.combo = 0;
-    this.emit('moveSpent', { movesLeft: this.movesLeft });
-
-    await this.resolveCascade(matches, [r1, c1]);
-    this.checkWinLoss();
-  }
-
-  _isAdjacent(r1, c1, r2, c2) {
-    return (Math.abs(r1 - r2) + Math.abs(c1 - c2)) === 1;
-  }
-
-  _swapCells(r1, c1, r2, c2) {
-    const tmp = this.grid[r1][c1];
-    this.grid[r1][c1] = this.grid[r2][c2];
-    this.grid[r2][c2] = tmp;
-  }
-
-  /* ---------------- MATCH DETECTION ---------------- */
-  findMatches(grid = this.grid) {
-    const runs = [];
-    // horizontal runs
-    for (let r = 0; r < this.rows; r++) {
-      let c = 0;
-      while (c < this.cols) {
-        const t = grid[r][c]?.type;
-        let len = 1;
-        while (c + len < this.cols && grid[r][c + len]?.type === t) len++;
-        if (t != null && len >= 3) {
-          const cells = []; for (let k = 0; k < len; k++) cells.push([r, c + k]);
-          runs.push({ orientation: 'H', type: t, cells, length: len });
-        }
-        c += len;
-      }
-    }
-    // vertical runs
-    for (let c = 0; c < this.cols; c++) {
-      let r = 0;
-      while (r < this.rows) {
-        const t = grid[r][c]?.type;
-        let len = 1;
-        while (r + len < this.rows && grid[r + len][c]?.type === t) len++;
-        if (t != null && len >= 3) {
-          const cells = []; for (let k = 0; k < len; k++) cells.push([r + k, c]);
-          runs.push({ orientation: 'V', type: t, cells, length: len });
-        }
-        r += len;
-      }
-    }
-    if (runs.length === 0) return [];
-
-    // union runs that share a cell into clusters (handles cascades + T/L shapes)
-    const key = (r, c) => `${r},${c}`;
-    const cellToRuns = new Map();
-    runs.forEach((run, i) => run.cells.forEach(([r, c]) => {
-      const k = key(r, c);
-      if (!cellToRuns.has(k)) cellToRuns.set(k, []);
-      cellToRuns.get(k).push(i);
+  function renderQuiz(msg) {
+    const A = S.att, size = pageSize(), total = A.questions.length, pages = Math.ceil(total / size);
+    const qs = A.questions.slice(S.page * size, (S.page + 1) * size);
+    const answered = Object.keys(A.answers).length;
+    const last = S.page === pages - 1;
+    view(`<div class="card"><h2>第 ${S.page + 1} / ${pages} 页 · 已答 ${answered} / ${total}</h2>
+      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${answered}"><i style="width:${(answered / total) * 100}%"></i></div>
+      <p class="muted">请根据你的真实感受，选择每句话与你的符合程度（1 = 完全不符合，6 = 完全符合）。答案会自动保存，可随时关闭，之后用同一邮箱和密钥继续。</p>
+      ${qs.map((q, i) => `<fieldset class="q" style="border:0;margin:0;padding:14px 0"><legend style="padding:0;font-weight:600">${S.page * size + i + 1}. ${esc(q.text)}</legend>
+        <div class="scale">${[1, 2, 3, 4, 5, 6].map((v) => `<label class="opt"><input type="radio" name="q${q.id}" value="${v}" data-q="${q.id}" ${A.answers[q.id] === v ? 'checked' : ''}><span>${v}</span></label>`).join('')}</div>
+        <div class="ends"><span>完全不符合</span><span>完全符合</span></div></fieldset>`).join('')}
+      <div class="err" id="err" role="alert">${esc(msg || '')}</div>
+      <div class="row"><button class="ghost" id="prev" ${S.page === 0 ? 'disabled' : ''}>上一页</button><button id="next" disabled>${last ? (A.config.top3Bonus ? '下一步' : '提交并查看结果') : '下一页'}</button></div></div>`);
+    const next = $('#next');
+    const ready = () => (next.disabled = !qs.every((q) => A.answers[q.id]));
+    ready();
+    app.querySelectorAll('input[type=radio]').forEach((r) => r.addEventListener('change', () => {
+      const id = Number(r.dataset.q), v = Number(r.value);
+      A.answers[id] = v; dirty[id] = v; ready();
+      const n = Object.keys(A.answers).length;
+      $('.bar i').style.width = (n / total) * 100 + '%';
+      $('h2').textContent = `第 ${S.page + 1} / ${pages} 页 · 已答 ${n} / ${total}`;
+      clearTimeout(saveTimer); saveTimer = setTimeout(() => flush().catch(() => {}), 500);
     }));
-
-    const visited = new Set();
-    const clusters = [];
-    runs.forEach((_, i) => {
-      if (visited.has(i)) return;
-      const stack = [i], group = new Set();
-      while (stack.length) {
-        const idx = stack.pop();
-        if (group.has(idx)) continue;
-        group.add(idx); visited.add(idx);
-        runs[idx].cells.forEach(([r, c]) => {
-          cellToRuns.get(key(r, c)).forEach(j => { if (!group.has(j)) stack.push(j); });
-        });
-      }
-      const groupRuns = [...group].map(idx => runs[idx]);
-      const cellSet = new Map();
-      groupRuns.forEach(run => run.cells.forEach(([r, c]) => cellSet.set(key(r, c), [r, c])));
-      const orientations = new Set(groupRuns.map(r => r.orientation));
-      clusters.push({
-        cells: [...cellSet.values()],
-        type: groupRuns[0].type,
-        maxLength: Math.max(...groupRuns.map(r => r.length)),
-        crossShape: orientations.size > 1,
-        dominantOrientation: groupRuns.reduce((a, b) => a.length >= b.length ? a : b).orientation,
-      });
+    $('#prev').addEventListener('click', async () => { try { await flush(); } catch (e) { /* 忽略，下一页再试 */ } S.page--; renderQuiz(); });
+    next.addEventListener('click', async () => {
+      next.disabled = true;
+      try { await flush(); } catch (e) { return renderQuiz('保存失败：' + e.message + '（请检查网络后重试）'); }
+      if (!last) { S.page++; return renderQuiz(); }
+      A.config.top3Bonus ? renderPicks() : submit();
     });
-    return clusters;
   }
 
-  /* ---------------- ELIMINATION, SPECIAL SPAWN, SCORING ---------------- */
-  eliminateMatches(matches, swapHint) {
-    const toRemove = new Set();
-    const spawns = []; // {r,c,type,special}
-    const key = (r, c) => `${r},${c}`;
+  function renderPicks(msg) {
+    const A = S.att;
+    view(`<div class="card"><h2>最后一步：选出最认同的 3 句话</h2>
+      <p class="muted">从下面 40 句话中，选出最能代表你的 3 句。已选 <b id="cnt">${S.picks.length}</b> / 3。</p>
+      ${A.questions.map((q) => `<label class="pick"><input type="checkbox" value="${q.id}" ${S.picks.includes(q.id) ? 'checked' : ''}><span>${esc(q.text)}</span></label>`).join('')}
+      <div class="err" id="err" role="alert">${esc(msg || '')}</div>
+      <div class="row"><button class="ghost" id="back">返回修改</button><button id="go" disabled>提交并查看结果</button></div></div>`);
+    const sync = () => {
+      S.picks = [...app.querySelectorAll('input:checked')].map((c) => Number(c.value));
+      $('#cnt').textContent = S.picks.length; $('#go').disabled = S.picks.length !== 3;
+      app.querySelectorAll('input:not(:checked)').forEach((c) => (c.disabled = S.picks.length >= 3));
+    };
+    app.querySelectorAll('input').forEach((c) => c.addEventListener('change', sync)); sync();
+    $('#back').addEventListener('click', () => { S.page = Math.ceil(A.questions.length / pageSize()) - 1; renderQuiz(); });
+    $('#go').addEventListener('click', submit);
+  }
 
-    matches.forEach(cluster => {
-      cluster.cells.forEach(([r, c]) => toRemove.add(key(r, c)));
+  async function submit() {
+    const btn = $('#go') || $('#next'); if (btn) btn.disabled = true;
+    try {
+      const r = await api('POST', `/api/attempts/${S.att.id}/submit`, { picks: S.att.config.top3Bonus ? S.picks : [] });
+      S.attempts = (await api('GET', '/api/me')).attempts; S.att = r; renderResult(r);
+    } catch (e) { S.att.config.top3Bonus ? renderPicks(e.message) : renderQuiz(e.message); }
+  }
 
-      let special = null;
-      if (cluster.cells.length >= 5 || cluster.crossShape) special = 'bomb';
-      else if (cluster.maxLength === 4) special = cluster.dominantOrientation === 'H' ? 'lineH' : 'lineV';
+  // ---------- 结果 ----------
+  function radar(scores, order) {
+    const C = 160, R = 105, n = order.length, MAX = S.cfg.top3Bonus ? 8 : 6;
+    const pt = (i, r) => { const a = -Math.PI / 2 + (2 * Math.PI * i) / n; return [C + r * Math.cos(a), C + r * Math.sin(a)]; };
+    const rings = [1 / 3, 2 / 3, 1].map((v) => `<polygon class="grid" points="${order.map((_, i) => pt(i, R * v).join(',')).join(' ')}"/>`).join('');
+    const axes = order.map((_, i) => `<line class="grid" x1="${C}" y1="${C}" x2="${pt(i, R)[0]}" y2="${pt(i, R)[1]}"/>`).join('');
+    const shape = `<polygon class="shape" points="${order.map((c, i) => pt(i, (R * Math.min(scores[c], MAX)) / MAX).join(',')).join(' ')}"/>`;
+    const labels = order.map((c, i) => { const [x, y] = pt(i, R + 22); return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle">${esc(S.cfg.anchors[c].name.replace('型', ''))}</text>`; }).join('');
+    return `<svg class="radar" viewBox="0 0 320 320" role="img" aria-label="八个职业锚得分雷达图">${rings}${axes}${shape}${labels}</svg>`;
+  }
+  const list = (arr) => `<ul class="tag-list">${arr.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
 
-      if (special) {
-        // spawn at the cell the player just moved into, if it belongs to this
-        // cluster, otherwise fall back to the cluster's first cell
-        let spawnCell = cluster.cells[0];
-        if (swapHint) {
-          const hit = cluster.cells.find(([r, c]) => r === swapHint[0] && c === swapHint[1]);
-          if (hit) spawnCell = hit;
+  // ---------- 保存为图片（Canvas 自绘，无需外部库） ----------
+  function drawReport(r) {
+    const AN = S.cfg.anchors, order = S.cfg.order, MAX = S.cfg.top3Bonus ? 8 : 6;
+    const W = 1080, P = 64, CW = W - P * 2;
+    const FONT = '-apple-system,"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif';
+    const col = { bg: '#ffffff', text: '#1f2933', muted: '#667085', brand: '#2f6fed', line: '#e4e7ec', sel: '#e8f0fe' };
+    function layout(ctx, draw) {
+      let y = 0;
+      const wrap = (t, size, color, opt = {}) => {
+        const x = P + (opt.indent || 0), w = CW - (opt.indent || 0), lh = Math.round(size * 1.55);
+        ctx.font = `${opt.bold ? '700' : '400'} ${size}px ${FONT}`; ctx.fillStyle = color; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+        let line = '';
+        for (const ch of t) {
+          if (ctx.measureText(line + ch).width > w && line) { if (draw) ctx.fillText(line, x, y); y += lh; line = ch; } else line += ch;
         }
-        spawns.push({ r: spawnCell[0], c: spawnCell[1], type: cluster.type, special });
-        toRemove.delete(key(spawnCell[0], spawnCell[1])); // the spawn cell survives as the special tile
-      }
-    });
-
-    // chain-trigger any PRE-EXISTING special tiles caught in the blast
-    const queue = [...toRemove];
-    const processed = new Set();
-    while (queue.length) {
-      const k = queue.pop();
-      if (processed.has(k)) continue;
-      processed.add(k);
-      const [r, c] = k.split(',').map(Number);
-      const tile = this.grid[r][c];
-      if (!tile || !tile.special) continue;
-      const extra = this._specialEffectCells(r, c, tile.special, tile.type);
-      extra.forEach(([er, ec]) => {
-        const ek = key(er, ec);
-        if (!toRemove.has(ek)) { toRemove.add(ek); queue.push(ek); }
+        if (line) { if (draw) ctx.fillText(line, x, y); y += lh; }
+      };
+      const bullets = (arr) => arr.forEach((t) => { if (draw) { ctx.fillStyle = col.brand; ctx.beginPath(); ctx.arc(P + 8, y + 21, 5, 0, 7); ctx.fill(); } wrap(t, 28, col.text, { indent: 28 }); });
+      if (draw) { ctx.fillStyle = col.bg; ctx.fillRect(0, 0, W, 99999); ctx.fillStyle = col.brand; ctx.fillRect(0, 0, W, 14); }
+      y = 70;
+      wrap(`${r.name} 的职业锚报告`, 44, col.brand, { bold: true });
+      wrap(`${r.name} · ${fmt(r.submittedAt)} · ${r.reportNo}`, 24, col.muted);
+      y += 24;
+      wrap('我的主职业锚', 30, col.muted);
+      wrap(r.primary.map((c) => AN[c].name).join(' · '), 66, col.text, { bold: true });
+      y += 16;
+      r.primary.forEach((c) => {
+        const a = AN[c];
+        if (draw) { ctx.fillStyle = col.sel; ctx.fillRect(P, y, CW, 2); }
+        y += 24;
+        wrap(`${a.name}（${a.en}）`, 32, col.brand, { bold: true });
+        wrap(a.definition, 28, col.text);
+        y += 10; wrap('核心动机', 28, col.muted, { bold: true }); wrap(a.motivation, 28, col.text);
+        y += 10; wrap('典型优势', 28, col.muted, { bold: true }); bullets(a.strengths);
+        y += 10; wrap('发展建议', 28, col.muted, { bold: true }); bullets(a.advice);
+        y += 20;
       });
-    }
-
-    let clearedCount = 0;
-    toRemove.forEach(k => {
-      const [r, c] = k.split(',').map(Number);
-      if (this.grid[r][c]) { this.grid[r][c] = null; clearedCount++; }
-    });
-    spawns.forEach(s => {
-      this.grid[s.r][s.c] = { id: this._idSeq++, type: s.type, special: s.special, state: 'idle' };
-    });
-
-    return { clearedCount, spawns, removedCells: [...toRemove].map(k => k.split(',').map(Number)) };
-  }
-
-  _specialEffectCells(r, c, special, type) {
-    const cells = [];
-    if (special === 'lineH') for (let cc = 0; cc < this.cols; cc++) cells.push([r, cc]);
-    else if (special === 'lineV') for (let rr = 0; rr < this.rows; rr++) cells.push([rr, c]);
-    else if (special === 'bomb') {
-      for (let rr = 0; rr < this.rows; rr++)
-        for (let cc = 0; cc < this.cols; cc++)
-          if (this.grid[rr][cc]?.type === type) cells.push([rr, cc]);
-    }
-    return cells;
-  }
-
-  /* ---------------- GRAVITY & REFILL ---------------- */
-  applyGravityAndRefill() {
-    const moved = [];
-    const spawned = [];
-    for (let c = 0; c < this.cols; c++) {
-      const stack = [];
-      for (let r = this.rows - 1; r >= 0; r--) {
-        if (this.grid[r][c]) stack.push(this.grid[r][c]);
+      if (draw) { ctx.fillStyle = col.sel; ctx.fillRect(P, y, CW, 2); }
+      y += 30;
+      wrap('八个维度得分', 34, col.text, { bold: true });
+      y += 20;
+      const R = 220, cx = W / 2, cy = y + R + 50;
+      if (draw) {
+        const pt = (i, rr) => { const t = -Math.PI / 2 + (2 * Math.PI * i) / order.length; return [cx + rr * Math.cos(t), cy + rr * Math.sin(t)]; };
+        ctx.strokeStyle = col.line; ctx.lineWidth = 2;
+        [1 / 3, 2 / 3, 1].forEach((f) => { ctx.beginPath(); order.forEach((_, i) => { const [x, yy] = pt(i, R * f); i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy); }); ctx.closePath(); ctx.stroke(); });
+        order.forEach((_, i) => { const [x, yy] = pt(i, R); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x, yy); ctx.stroke(); });
+        ctx.beginPath();
+        order.forEach((c, i) => { const [x, yy] = pt(i, (R * Math.min(r.scores[c], MAX)) / MAX); i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy); });
+        ctx.closePath(); ctx.fillStyle = 'rgba(47,111,237,.25)'; ctx.fill(); ctx.strokeStyle = col.brand; ctx.lineWidth = 4; ctx.stroke();
+        ctx.fillStyle = col.text; ctx.font = `400 26px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        order.forEach((c, i) => { const [x, yy] = pt(i, R + 46); ctx.fillText(AN[c].name.replace('型', ''), x, yy); });
       }
-      // stack[0] is the lowest existing tile; place from bottom up
-      for (let r = this.rows - 1, i = 0; r >= 0; r--, i++) {
-        const tile = stack[i] || null;
-        const prevCellHadThisTile = false;
-        if (tile) {
-          if (this.grid[r][c] !== tile) moved.push({ id: tile.id, toR: r, toC: c });
-          this.grid[r][c] = tile;
-        } else {
-          const fresh = this.newTile(this.randomType());
-          this.grid[r][c] = fresh;
-          spawned.push({ id: fresh.id, r, c, type: fresh.type });
+      y = cy + R + 90;
+      r.ranking.forEach((c) => {
+        if (draw) {
+          ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.font = `400 28px ${FONT}`; ctx.fillStyle = col.text; ctx.fillText(AN[c].name, P, y);
+          ctx.fillStyle = col.line; ctx.fillRect(P + 280, y + 10, 560, 16);
+          ctx.fillStyle = r.primary.includes(c) ? col.brand : '#9db8f5'; ctx.fillRect(P + 280, y + 10, (560 * Math.min(r.scores[c], MAX)) / MAX, 16);
+          ctx.fillStyle = col.text; ctx.textAlign = 'right'; ctx.fillText(r.scores[c].toFixed(1), W - P, y);
         }
-      }
-    }
-    return { moved, spawned };
-  }
-
-  /* ---------------- CASCADE LOOP (MATCH -> ELIMINATE -> FALL -> repeat) ---------------- */
-  async resolveCascade(initialMatches, swapHint) {
-    let matches = initialMatches;
-    let hint = swapHint;
-    while (matches.length > 0) {
-      this.combo++;
-      this.state = 'ELIMINATING';
-      this.emit('stateChange', { state: this.state });
-
-      const { clearedCount, spawns, removedCells } = this.eliminateMatches(matches, hint);
-      const gained = Math.round(clearedCount * 100 * (1 + (this.combo - 1) * 0.5));
-      this.score += gained;
-
-      await this.requestRender('eliminate', {
-        removedCells, spawns, gained, combo: this.combo, score: this.score,
+        y += 48;
       });
-
-      this.state = 'FALLING';
-      this.emit('stateChange', { state: this.state });
-      const fallData = this.applyGravityAndRefill();
-      await this.requestRender('fall', fallData);
-
-      this.state = 'MATCH_DETECTION';
-      this.emit('stateChange', { state: this.state });
-      matches = this.findMatches();
-      hint = null; // only the original swap location gets spawn priority
+      y += 30;
+      wrap('本测评基于 Schein 职业锚理论，仅作为自我认知参考，不构成录用、诊断或其他决策依据。', 22, col.muted);
+      y += 50;
+      return y;
     }
-
-    // soft-lock guard: if cascades leave a board with no possible move, reshuffle
-    if (!this.hasValidMove(this.grid)) {
-      console.log('[State]: NO_VALID_MOVES - reshuffling board');
-      this.grid = this.generateValidBoard();
-      await this.requestRender('renderSync', { grid: this.cloneGrid() });
-    }
+    const probe = document.createElement('canvas').getContext('2d');
+    const H = layout(probe, false);
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    layout(c.getContext('2d'), true);
+    return c;
   }
 
-  /* ---------------- WIN / LOSS ---------------- */
-  checkWinLoss() {
-    this.state = 'CHECK_WIN_LOSS';
-    this.emit('stateChange', { state: this.state });
-    if (this.score >= this.config.target) {
-      this.state = 'GAME_OVER';
-      this.emit('gameOver', { result: 'WIN', score: this.score });
-    } else if (this.movesLeft <= 0) {
-      this.state = 'GAME_OVER';
-      this.emit('gameOver', { result: 'LOSS', score: this.score });
-    } else {
-      this.state = 'IDLE';
-      this.emit('stateChange', { state: this.state });
-    }
-  }
-}
-
-/* =========================================================================
-   RENDERER
-   Reads engine state, manages DOM only. Never mutates engine.grid directly.
-   Every animation handshake ends by calling done() so the engine can
-   proceed — and a full DOM rebuild always sources truth from engine.grid,
-   so a dropped/late animation frame can never leave the UI out of sync
-   with the real grid array.
-   ========================================================================= */
-class GameRenderer {
-  constructor(engine, boardEl) {
-    this.engine = engine;
-    this.boardEl = boardEl;
-    this.cellSize = 52; // 48px tile + 4px gap
-    this.elements = new Map(); // tile id -> DOM node
-    this.selected = null;
-
-    engine.on('init', ({ grid }) => this.fullRebuild(grid));
-    engine.on('swap', (d) => this.handleSwap(d));
-    engine.on('revertSwap', (d) => this.handleSwap(d));
-    engine.on('eliminate', (d) => this.handleEliminate(d));
-    engine.on('fall', (d) => this.handleFall(d));
-    engine.on('renderSync', (d) => this.handleSync(d));
-
-    boardEl.addEventListener('click', (e) => this.handleClick(e));
+  function saveImage(r) {
+    const c = drawReport(r);
+    c.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `职业锚报告-${r.name.replace(/[\\/:*?"<>|]/g, '')}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      let box = $('#preview');
+      if (!box) { box = document.createElement('div'); box.id = 'preview'; box.className = 'card noprint'; app.appendChild(box); }
+      box.innerHTML = '<p class="muted">图片已生成。如果没有自动下载，请长按（电脑上右键）下面的图片，选择"保存图片"。</p><img alt="职业锚报告图片" style="width:100%;border:1px solid var(--line);border-radius:8px">';
+      box.querySelector('img').src = url;
+      box.scrollIntoView({ behavior: 'smooth' });
+    }, 'image/png');
   }
 
-  posStyle(r, c) { return { top: `${10 + r * this.cellSize}px`, left: `${10 + c * this.cellSize}px` }; }
-
-  fullRebuild(grid) {
-    this.boardEl.innerHTML = '';
-    this.elements.clear();
-    for (let r = 0; r < grid.length; r++) {
-      for (let c = 0; c < grid[r].length; c++) {
-        const tile = grid[r][c];
-        if (!tile) continue;
-        this.createTileEl(tile, r, c);
-      }
-    }
+  function renderResult(r) {
+    const AN = S.cfg.anchors, order = S.cfg.order, MAX = S.cfg.top3Bonus ? 8 : 6;
+    const sec = r.ranking.filter((c) => !r.primary.includes(c)).slice(0, 2);
+    view(`<div class="card hero"><p class="muted">${esc(r.name)} · ${fmt(r.submittedAt)} · 报告编号 ${esc(r.reportNo)}</p>
+      <h1>${esc(r.name)} 的职业锚报告</h1>
+      <p><b>主职业锚：${r.primary.map((c) => esc(AN[c].name)).join('、')}</b></p>
+      ${r.primary.map((c) => `<p><span class="badge">${esc(c)}</span>${esc(AN[c].definition)}</p>`).join('')}</div>
+      ${r.primary.map((c) => `<div class="card"><h2>${esc(AN[c].name)}（${esc(AN[c].en)}）</h2>
+        <h3>核心动机</h3><p>${esc(AN[c].motivation)}</p><h3>典型优势</h3>${list(AN[c].strengths)}<h3>潜在盲区</h3>${list(AN[c].blindspots)}
+        <h3>适合的岗位与环境</h3>${list(AN[c].fit)}<h3>不太适合的环境</h3><p>${esc(AN[c].avoid.join('；'))}</p><h3>发展建议</h3>${list(AN[c].advice)}</div>`).join('')}
+      <div class="card"><h2>八个维度得分</h2>${radar(r.scores, order)}
+        <table><thead><tr><th>职业锚</th><th>得分</th><th></th></tr></thead><tbody>${r.ranking.map((c) => `<tr><td>${esc(AN[c].name)}</td><td>${r.scores[c].toFixed(1)}</td><td><div class="score-bar"><i style="width:${Math.min(r.scores[c], MAX) / MAX * 100}%"></i></div></td></tr>`).join('')}</tbody></table>
+        <p class="muted">分数越高表示该动机对你越重要（题目均分 1–6；你选出的 3 句话所属维度各加 0.8 分，因此最高可达 8.4）。</p></div>
+      <div class="card"><h2>次要职业锚</h2>${sec.map((c) => `<p><b>${esc(AN[c].name)}</b>：${esc(AN[c].definition)}</p>`).join('')}</div>
+      <div class="card muted">本测评基于 Schein 职业锚理论，仅作为自我认知参考，不构成录用、诊断或其他决策依据。</div>
+      <div class="row noprint"><button id="save">保存为图片</button><button class="ghost" id="print">打印 / 保存为 PDF</button><button class="ghost" id="home">我的记录</button><button class="ghost" id="out">退出</button></div>`);
+    $('#print').addEventListener('click', () => window.print());
+    $('#save').addEventListener('click', () => saveImage(r));
+    $('#home').addEventListener('click', async () => { S.attempts = (await api('GET', '/api/me')).attempts; renderHome(); });
+    $('#out').addEventListener('click', logout);
   }
 
-  createTileEl(tile, r, c) {
-    const el = document.createElement('div');
-    el.className = `tile t${tile.type}` + (tile.special ? ` special-${tile.special}` : '');
-    Object.assign(el.style, this.posStyle(r, c));
-    el.dataset.r = r; el.dataset.c = c; el.dataset.id = tile.id;
-    this.boardEl.appendChild(el);
-    this.elements.set(tile.id, el);
-    return el;
+  // ---------- 启动 ----------
+  async function render() {
+    if (!S.token) return renderEnter();
+    try {
+      const me = await api('GET', '/api/me'); S.name = me.name; S.attempts = me.attempts;
+      await afterLogin();
+    } catch (e) { setToken(null); renderEnter(); }
   }
+  render();
+})();
 
-  async handleSwap({ a, b, done }) {
-    // engine.grid already holds the post-swap (or reverted) truth; just
-    // re-read the current owners of cells a/b and move their DOM nodes.
-    const grid = this.engine.grid;
-    const tileA = grid[a[0]][a[1]], tileB = grid[b[0]][b[1]];
-    if (tileA) Object.assign(this.elements.get(tileA.id).style, this.posStyle(a[0], a[1]));
-    if (tileB) Object.assign(this.elements.get(tileB.id).style, this.posStyle(b[0], b[1]));
-    setTimeout(done, 220);
-  }
-
-  async handleEliminate({ removedCells, spawns, gained, combo, score, done }) {
-    removedCells.forEach(([r, c]) => {
-      // find element currently rendered at this position
-      const el = this.elements.get(this._idAt(r, c, 'before'));
-    });
-    // simplest reliable approach: mark-and-remove by scanning current DOM
-    // nodes whose stored r/c match a removed cell BEFORE the spawn overwrote it
-    removedCells.forEach(([r, c]) => {
-      const node = [...this.elements.values()].find(el => +el.dataset.r === r && +el.dataset.c === c);
-      if (node) {
-        node.classList.add('removing');
-        const id = +node.dataset.id;
-        setTimeout(() => { node.remove(); this.elements.delete(id); }, 260);
-      }
-    });
-    spawns.forEach(s => {
-      const tile = this.engine.grid[s.r][s.c];
-      const node = [...this.elements.values()].find(el => +el.dataset.r === s.r && +el.dataset.c === s.c);
-      if (node) { node.remove(); this.elements.delete(+node.dataset.id); }
-      this.createTileEl(tile, s.r, s.c);
-    });
-    this.updateHud(score, gained, combo);
-    setTimeout(done, 280);
-  }
-
-  _idAt() { return undefined; }
-
-  async handleFall({ moved, spawned, done }) {
-    moved.forEach(m => {
-      const el = this.elements.get(m.id);
-      if (el) { el.dataset.r = m.toR; el.dataset.c = m.toC; Object.assign(el.style, this.posStyle(m.toR, m.toC)); }
-    });
-    spawned.forEach(s => {
-      const tile = this.engine.grid[s.r][s.c];
-      const el = this.createTileEl(tile, -1, s.c); // start above the board
-      requestAnimationFrame(() => { el.dataset.r = s.r; Object.assign(el.style, this.posStyle(s.r, s.c)); });
-    });
-    setTimeout(done, 320);
-  }
-
-  handleSync({ grid, done }) {
-    this.fullRebuild(grid || this.engine.cloneGrid());
-    if (done) setTimeout(done, 50);
-  }
-
-  updateHud(score, gained, combo) {
-    document.getElementById('scoreVal').textContent = score;
-    const pct = Math.min(100, (score / this.engine.config.target) * 100);
-    document.getElementById('progressInner').style.width = pct + '%';
-    document.getElementById('movesVal').textContent = this.engine.movesLeft;
-  }
-
-  handleClick(e) {
-    const el = e.target.closest('.tile');
-    if (!el) return;
-    const r = +el.dataset.r, c = +el.dataset.c;
-    if (!this.selected) {
-      this.selected = { r, c, el };
-      el.classList.add('selected');
-      return;
-    }
-    const prev = this.selected;
-    prev.el.classList.remove('selected');
-    this.selected = null;
-    if (prev.r === r && prev.c === c) return;
-    this.engine.trySwap(prev.r, prev.c, r, c);
-  }
-}
-
-/* =========================================================================
-   APP BOOTSTRAP / LEVEL MANAGEMENT
-   ========================================================================= */
-const LEVELS = [
-  { id: 1, name: 'Level 1 — Onboarding', target: 4500, moves: 18 },
-  { id: 2, name: 'Level 2 — Cascade Test', target: 7500, moves: 22 },
-  { id: 3, name: 'Level 3 — Challenge', target: 11000, moves: 20 },
-];
-
-let currentEngine = null;
-let currentLevelIndex = 0;
-
-function renderLevelCards() {
-  const wrap = document.getElementById('levelCards');
-  wrap.innerHTML = '';
-  LEVELS.forEach((lvl, i) => {
-    const card = document.createElement('div');
-    card.className = 'levelCard';
-    card.innerHTML = `<h3>${lvl.name}</h3><p>Target ${lvl.target.toLocaleString()} pts &middot; ${lvl.moves} moves</p>`;
-    card.addEventListener('click', () => startLevel(i));
-    wrap.appendChild(card);
-  });
-}
-
-function startLevel(index) {
-  currentLevelIndex = index;
-  const cfg = LEVELS[index];
-  document.getElementById('levelSelect').style.display = 'none';
-  document.getElementById('hud').style.display = 'flex';
-  document.getElementById('boardWrap').style.display = 'block';
-  document.getElementById('modalOverlay').style.display = 'none';
-
-  document.getElementById('movesVal').textContent = cfg.moves;
-  document.getElementById('scoreVal').textContent = 0;
-  document.getElementById('targetVal').textContent = cfg.target;
-  document.getElementById('progressInner').style.width = '0%';
-
-  currentEngine = new GameEngine({ target: cfg.target, moves: cfg.moves });
-  const boardEl = document.getElementById('board');
-  new GameRenderer(currentEngine, boardEl);
-
-  currentEngine.on('moveSpent', ({ movesLeft }) => {
-    document.getElementById('movesVal').textContent = movesLeft;
-  });
-  currentEngine.on('gameOver', ({ result, score }) => showModal(result, score, cfg));
-
-  currentEngine.init();
-}
-
-function showModal(result, score, cfg) {
-  document.getElementById('modalOverlay').style.display = 'flex';
-  document.getElementById('modalTitle').textContent = result === 'WIN' ? 'Level Complete!' : 'Out of Moves';
-  document.getElementById('modalMsg').textContent =
-    `Score: ${score} / Target: ${cfg.target}`;
-  const nextBtn = document.getElementById('modalNext');
-  const hasNext = result === 'WIN' && currentLevelIndex < LEVELS.length - 1;
-  nextBtn.style.display = hasNext ? 'inline-block' : 'none';
-}
-
-document.getElementById('modalReplay').addEventListener('click', () => startLevel(currentLevelIndex));
-document.getElementById('modalNext').addEventListener('click', () => startLevel(currentLevelIndex + 1));
-document.getElementById('backBtn').addEventListener('click', () => {
-  document.getElementById('hud').style.display = 'none';
-  document.getElementById('boardWrap').style.display = 'none';
-  document.getElementById('modalOverlay').style.display = 'none';
-  document.getElementById('levelSelect').style.display = 'flex';
-});
-
-renderLevelCards();
 </script>
 </body>
 </html>
