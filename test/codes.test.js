@@ -86,13 +86,84 @@ test('作废：只能作废未使用的；作废后不可使用', async () => {
 test('列表、汇总与 CSV 导出', async () => {
   const all = await admin('GET', '/api/admin/codes');
   const s = all.body.summary;
-  assert.equal(s.total, s.unused + s.used + s.voided);
-  assert.ok(s.used >= 4 && s.voided >= 1 && s.unused >= 1);
-  assert.equal((await admin('GET', '/api/admin/codes?status=unused')).body.rows.every((r) => !r.usedAt && !r.voided), true);
+  assert.equal(s.total, s.active + s.used + s.expired + s.voided);
+  assert.ok(s.used >= 4 && s.voided >= 1 && s.active >= 1);
+  assert.equal((await admin('GET', '/api/admin/codes?status=active')).body.rows.every((r) => r.state === 'active'), true);
   const csv = await admin('GET', '/api/admin/codes/export.csv');
   assert.equal(csv.status, 200);
-  assert.ok(csv.body.includes('订单 A001') && csv.body.includes('已使用'));
+  assert.ok(csv.body.includes('订单 A001') && csv.body.includes('已用完'));
   assert.equal((await call('GET', '/api/admin/codes/export.csv')).status, 401);
+});
+
+test('通用码：创建校验（时长、人数上限、自定义码）', async () => {
+  assert.equal((await admin('POST', '/api/admin/codes', { kind: 'shared', hours: 0 })).status, 400);
+  assert.equal((await admin('POST', '/api/admin/codes', { kind: 'shared', hours: 9999 })).status, 400);
+  assert.equal((await admin('POST', '/api/admin/codes', { kind: 'shared', maxUses: 0 })).status, 400);
+  assert.equal((await admin('POST', '/api/admin/codes', { kind: 'shared', customCode: 'ab' })).status, 400);
+  const r = await admin('POST', '/api/admin/codes', { kind: 'shared', hours: 3, customCode: 'share 2026', note: '分享会' });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.codes[0].code, 'SHARE2026');
+  const left = r.body.codes[0].expiresAt - Date.now();
+  assert.ok(left > 2.9 * 3600_000 && left <= 3 * 3600_000);
+  assert.equal((await admin('POST', '/api/admin/codes', { kind: 'shared', customCode: 'SHARE-2026' })).status, 409); // 重复
+  const auto = await admin('POST', '/api/admin/codes', { kind: 'shared' });
+  assert.match(auto.body.codes[0].code, /^[A-HJ-NP-Z2-9]{6}$/);
+  assert.equal(auto.body.codes[0].expiresAt, null);
+});
+
+test('通用码：多人共用，每人限一次，已有草稿可继续', async () => {
+  const code = (await admin('POST', '/api/admin/codes', { kind: 'shared', hours: 3 })).body.codes[0].code;
+  const tokens = await Promise.all([40, 41, 42, 43].map(login));
+  const res = await Promise.all(tokens.map((t) => call('POST', '/api/attempts', { code: code.toLowerCase() }, t)));
+  assert.ok(res.every((r) => r.status === 200));
+  // 同一个人完成后再拿这个码重测：被拒
+  const t = tokens[0];
+  const a = res[0].body;
+  const answers = Object.fromEntries(a.questions.map((q) => [q.id, 3]));
+  assert.equal((await call('POST', `/api/attempts/${a.id}/submit`, { answers, picks: a.questions.slice(0, 3).map((q) => q.id) }, t)).status, 200);
+  const again = await call('POST', '/api/attempts', { code }, t);
+  assert.equal(again.status, 400);
+  assert.match(again.body.error, /已经用这个兑换码/);
+  // 列表里显示使用人数
+  const row = (await admin('GET', '/api/admin/codes')).body.rows.find((r) => r.code === code);
+  assert.equal(row.kind, 'shared');
+  assert.equal(row.uses, 4);
+  assert.equal(row.state, 'active');
+});
+
+test('通用码：人数上限，并发下不超发', async () => {
+  const code = (await admin('POST', '/api/admin/codes', { kind: 'shared', maxUses: 3 })).body.codes[0].code;
+  const tokens = await Promise.all([50, 51, 52, 53, 54, 55].map(login));
+  const res = await Promise.all(tokens.map((t) => call('POST', '/api/attempts', { code }, t)));
+  assert.equal(res.filter((r) => r.status === 200).length, 3);
+  assert.ok(res.filter((r) => r.status === 400).every((r) => /名额已满/.test(r.body.error)));
+  const row = (await admin('GET', '/api/admin/codes?status=used')).body.rows.find((r) => r.code === code);
+  assert.equal(row.state, 'used');
+});
+
+test('通用码：到期后不能用，延长有效期后恢复；作废立即失效', async () => {
+  const c = (await admin('POST', '/api/admin/codes', { kind: 'shared', hours: 0.0004 })).body.codes[0]; // 约 1.4 秒
+  assert.equal((await call('POST', '/api/attempts', { code: c.code }, await login(60))).status, 200);
+  await new Promise((r) => setTimeout(r, 1700));
+  const late = await call('POST', '/api/attempts', { code: c.code }, await login(61));
+  assert.equal(late.status, 400);
+  assert.match(late.body.error, /已过期/);
+  assert.equal((await admin('GET', '/api/admin/codes?status=expired')).body.rows.some((r) => r.id === c.id), true);
+  assert.equal((await admin('POST', `/api/admin/codes/${c.id}/extend`, { hours: 0 })).status, 400);
+  assert.equal((await admin('POST', `/api/admin/codes/${c.id}/extend`, { hours: 3 })).status, 200);
+  assert.equal((await call('POST', '/api/attempts', { code: c.code }, await login(62))).status, 200);
+  assert.equal((await admin('POST', `/api/admin/codes/${c.id}/void`)).status, 200);
+  const dead = await call('POST', '/api/attempts', { code: c.code }, await login(63));
+  assert.equal(dead.status, 400);
+  assert.equal((await admin('POST', `/api/admin/codes/${c.id}/extend`, { hours: 3 })).status, 409);
+});
+
+test('一次性码也可以设置有效期', async () => {
+  const c = (await admin('POST', '/api/admin/codes', { count: 1, hours: 0.0004 })).body.codes[0];
+  await new Promise((r) => setTimeout(r, 1700));
+  const r = await call('POST', '/api/attempts', { code: c.code }, await login(70));
+  assert.equal(r.status, 400);
+  assert.match(r.body.error, /已过期/);
 });
 
 test('错误次数过多会被限速', async () => {
