@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "消消乐",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "3000"],
+      "name": "职业锚测试",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server/server.js"],
       "port": 3000
     }
   ]

@@ -1,6 +1,6 @@
 # 职业锚在线测试
 
-项目全过程、现状、决策与待办见 [docs/PROJECT-NOTES.md](docs/PROJECT-NOTES.md)。
+项目全过程、现状、决策与待办见 [docs/PROJECT-NOTES.md](docs/PROJECT-NOTES.md)；产品管理体系（战略、指标、路线图、优先级、流程、风险）见 [docs/product/](docs/product/README.md)；更新记录见 [CHANGELOG.md](CHANGELOG.md)。
 
 基于 Schein 职业锚理论的 40 题测评。零依赖（需要 Node 22.5+，使用内置 `node:sqlite`）。
 
@@ -19,7 +19,7 @@ npm test
 - 身份：姓名 + 邮箱 + 自设查看密钥（scrypt 加盐哈希）。回访需「邮箱 + 密钥」；连续错 5 次锁 15 分钟；忘记密钥由后台重置。
 - 每次作答题序随机（种子入库），每题自动保存草稿，可断点续答；计分在服务端完成。
 - 题目与解读在 `server/data/questions.json`、`anchors.json`，参数在 `config.json`（`top3Bonus`、`pageSize` 等）。
-- 纯静态版（GitHub Pages）见 `career-anchor/`，由 `npm run build:static` 生成；首页是项目清单（职业锚测试链接到 anchor.matchgamers.com 的完整版），消消乐在 `game/xxl/`，`career-anchor/` 为不联网的静态备用版。
+- 纯静态版（GitHub Pages）见 `career-anchor/`，由 `npm run build:static` 生成；首页 `index.html` 是介绍页（按钮指向 anchor.matchgamers.com 的完整版），`career-anchor/` 为不联网的静态备用版。
 
 ## 已知取舍
 - 先注册某邮箱者先占有它（无邮件验证）；被他人占用时由管理员重置/删除。

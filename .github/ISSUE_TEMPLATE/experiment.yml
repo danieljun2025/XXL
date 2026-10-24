@@ -1,0 +1,25 @@
+name: 实验
+description: 想验证一个假设（标题、价格、文案、流程）。
+labels: ["type:experiment"]
+body:
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: 假设
+      placeholder: 如果我们 ____，那么 ____ 会 ____，因为 ____。
+    validations: { required: true }
+  - type: textarea
+    id: metric
+    attributes:
+      label: 指标与判定标准
+      description: 主指标、基线、护栏指标；什么结果算成功/失败/继续观察。
+    validations: { required: true }
+  - type: input
+    id: duration
+    attributes:
+      label: 持续时间与样本量
+    validations: { required: true }
+  - type: textarea
+    id: plan
+    attributes:
+      label: 做法

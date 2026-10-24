@@ -3,7 +3,7 @@
 (function () {
   const app = document.getElementById('app');
   let pw = ''; try { pw = sessionStorage.getItem('ca_admin') || ''; } catch (e) { /* 忽略 */ }
-  let page = 1, status = '', fresh = null, msg = '', kind = 'shared';
+  let page = 1, status = '', fresh = null, msg = '', kind = 'shared', teams = [], teamSel = new URLSearchParams(location.search).get('team') || '';
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = (t) => (t ? new Date(t).toLocaleString('zh-CN', { hour12: false }) : '');
   const denied = (m) => { app.innerHTML = `<div class="card"><h1>无权访问</h1><p>${esc(m || '请先登录管理后台，再从后台进入兑换码管理。')}</p><div class="row"><a href="/admin.html">前往管理后台</a></div></div>`; };
@@ -19,7 +19,7 @@
 
   async function load() {
     if (!pw) return denied();
-    try { draw(await api('GET', `/api/admin/codes?page=${page}&status=${status}`)); }
+    try { teams = (await api('GET', '/api/admin/teams')).teams; draw(await api('GET', `/api/admin/codes?page=${page}&status=${status}`)); }
     catch (e) { e.status === 401 || e.status === 429 ? denied('登录已失效，请回到管理后台重新登录。') : denied(e.message); }
   }
 
@@ -46,28 +46,29 @@
           ${shared ? '<div><label for="cc">自定义码（可不填，自动生成）</label><input id="cc" type="text" maxlength="24" placeholder="如 SHARE1024"></div>' : '<div><label for="cnt">数量</label><input id="cnt" type="number" min="1" max="200" value="10" required></div>'}
           <div><label for="hrs">有效时长（小时，留空=不限）</label><input id="hrs" type="number" min="0.1" step="any" value="${shared ? 3 : ''}" placeholder="如 3"></div>
           ${shared ? '<div><label for="mu">最多使用人数（留空=不限）</label><input id="mu" type="number" min="1" step="1" placeholder="如 50"></div>' : ''}
+          <div><label for="tm">所属团队（可不选）</label><select id="tm"><option value="">不属于任何团队</option>${teams.map((t) => `<option value="${t.id}"${String(t.id) === String(teamSel) ? ' selected' : ''}>${esc(t.name)}${t.closed ? '（已关闭）' : ''}</option>`).join('')}</select></div>
           <div><label for="note">备注（可不填）</label><input id="note" type="text" maxlength="60" placeholder="${shared ? '如 10 月 24 日分享会' : '如 闲鱼订单号'}"></div>
           <button type="submit">生成</button></form>
         <div class="err" id="err" role="alert">${esc(msg)}</div>${freshBlock()}</section>
       <section class="panel"><h2>全部兑换码</h2>
         <div class="row" style="margin:0 0 10px"><select id="st" aria-label="状态筛选"><option value="">全部状态</option><option value="active">当前可用</option><option value="used">已用完</option><option value="expired">已过期</option><option value="voided">已作废</option></select>
           <button type="button" class="ghost" id="csv">导出 CSV</button></div>
-        <div class="tw"><table><thead><tr><th>兑换码</th><th>类型</th><th>备注</th><th>状态</th><th>使用</th><th>到期时间</th><th>操作</th></tr></thead><tbody>
-        ${d.rows.map((r) => { const st = STATE[r.state]; return `<tr><td class="mono">${esc(r.code)}</td><td>${r.kind === 'shared' ? '通用' : '一次性'}</td><td>${esc(r.note)}</td>
+        <div class="tw"><table><thead><tr><th>兑换码</th><th>类型</th><th>团队</th><th>备注</th><th>状态</th><th>使用</th><th>到期时间</th><th>操作</th></tr></thead><tbody>
+        ${d.rows.map((r) => { const st = STATE[r.state]; return `<tr><td class="mono">${esc(r.code)}</td><td>${r.kind === 'shared' ? '通用' : '一次性'}</td><td>${esc(r.team)}</td><td>${esc(r.note)}</td>
           <td><span class="pill ${st[1]}">${st[0]}</span></td>
           <td>${r.kind === 'shared' ? `${r.uses}${r.maxUses ? ' / ' + r.maxUses : ''} 人` : r.usedBy ? esc(r.usedBy) + '<br><span class="muted">' + fmt(r.usedAt) + '</span>' : '—'}</td>
           <td>${r.expiresAt ? fmt(r.expiresAt) : '不限'}</td>
-          <td><button class="ghost" data-cp="${esc(r.code)}">复制</button>${r.state !== 'voided' && !(r.kind === 'single' && r.usedAt) ? `<button class="ghost" data-ext="${r.id}">设置有效期</button>` : ''}${r.state !== 'voided' && !(r.kind === 'single' && r.usedAt) ? `<button class="ghost" data-v="${r.id}">作废</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="7" class="muted">还没有兑换码，先在上面生成几个。</td></tr>'}
+          <td><button class="ghost" data-cp="${esc(r.code)}">复制</button>${r.state !== 'voided' && !(r.kind === 'single' && r.usedAt) ? `<button class="ghost" data-ext="${r.id}">设置有效期</button>` : ''}${r.state !== 'voided' && !(r.kind === 'single' && r.usedAt) ? `<button class="ghost" data-v="${r.id}">作废</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="8" class="muted">还没有兑换码，先在上面生成几个。</td></tr>'}
         </tbody></table></div>
         <div class="row"><button class="ghost" id="pv" ${page <= 1 ? 'disabled' : ''}>上一页</button><span>${page} / ${pages}（共 ${d.total} 个）</span><button class="ghost" id="nx" ${page >= pages ? 'disabled' : ''}>下一页</button></div></section>`;
     document.getElementById('st').value = status;
     app.querySelectorAll('[data-kind]').forEach((b) => (b.onclick = () => { kind = b.dataset.kind; fresh = null; msg = ''; load(); }));
     document.getElementById('g').addEventListener('submit', async (e) => {
-      e.preventDefault(); msg = '';
+      e.preventDefault(); msg = ''; teamSel = document.getElementById('tm').value;
       const val = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
       const body = shared
-        ? { kind: 'shared', customCode: val('cc'), hours: val('hrs'), maxUses: val('mu'), note: val('note') }
-        : { kind: 'single', count: Number(val('cnt')), hours: val('hrs'), note: val('note') };
+        ? { kind: 'shared', customCode: val('cc'), hours: val('hrs'), maxUses: val('mu'), note: val('note'), teamId: val('tm') }
+        : { kind: 'single', count: Number(val('cnt')), hours: val('hrs'), note: val('note'), teamId: val('tm') };
       try { fresh = (await api('POST', '/api/admin/codes', body)).codes; page = 1; status = ''; }
       catch (er) { msg = er.message; fresh = null; }
       load();

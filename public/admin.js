@@ -28,13 +28,13 @@
   }
   function draw(ls) {
     const A = cfg.anchors, pages = Math.max(1, Math.ceil(ls.total / ls.size));
-    app.innerHTML = `<div class="card"><h1>管理后台</h1><p class="muted">共 ${ls.total} 条记录。</p><div class="row"><a class="btnlink" href="/report.html">查看统计报表 →</a> <a class="btnlink" href="/codes.html">兑换码管理 →</a></div></div>
+    app.innerHTML = `<div class="card"><h1>管理后台</h1><p class="muted">共 ${ls.total} 条记录。</p><div class="row"><a class="btnlink" href="/report.html">查看统计报表 →</a> <a class="btnlink" href="/codes.html">兑换码管理 →</a> <a class="btnlink" href="/teams.html">团队管理 →</a></div></div>
       <div class="card"><form id="s" class="row" style="margin:0"><input id="q" type="text" placeholder="搜索姓名或邮箱" value="${esc(q)}" style="max-width:260px">
         <select id="st" style="padding:10px;border-radius:10px"><option value="">全部状态</option><option value="submitted" ${status === 'submitted' ? 'selected' : ''}>已提交</option><option value="draft" ${status === 'draft' ? 'selected' : ''}>进行中</option></select>
         <button>搜索</button><button type="button" class="ghost" id="csv">导出 CSV</button><button type="button" class="ghost" id="out">退出</button></form>
-      <div class="tw"><table><thead><tr><th>姓名</th><th>邮箱</th><th>状态</th><th>主职业锚</th><th>提交时间</th><th>操作</th></tr></thead><tbody>
-      ${ls.rows.map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.email)}</td><td>${r.status === 'submitted' ? '已提交' : '进行中'}</td><td>${(r.primary || []).map((c) => esc(A[c].name)).join('、')}</td><td>${fmt(r.submittedAt)}</td>
-      <td>${r.status === 'submitted' ? `<button class="ghost" data-v="${r.id}">报告</button>` : ''}<button class="ghost" data-k="${r.participantId}">重置密钥</button><button class="ghost" data-d="${r.participantId}">删除</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted">暂无数据</td></tr>'}
+      <div class="tw"><table><thead><tr><th>姓名</th><th>邮箱</th><th>团队</th><th>状态</th><th>主职业锚</th><th>提交时间</th><th>操作</th></tr></thead><tbody>
+      ${ls.rows.map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.email)}</td><td>${esc(r.team)}</td><td>${r.status === 'submitted' ? '已提交' : '进行中'}</td><td>${(r.primary || []).map((c) => esc(A[c].name)).join('、')}</td><td>${fmt(r.submittedAt)}</td>
+      <td>${r.status === 'submitted' ? `<button class="ghost" data-v="${r.id}">报告</button>` : ''}<button class="ghost" data-k="${r.participantId}">重置密钥</button><button class="ghost" data-d="${r.participantId}">删除</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">暂无数据</td></tr>'}
       </tbody></table></div>
       <div class="row"><button class="ghost" id="pv" ${page <= 1 ? 'disabled' : ''}>上一页</button><span>${page} / ${pages}（共 ${ls.total} 条）</span><button class="ghost" id="nx" ${page >= pages ? 'disabled' : ''}>下一页</button></div></div>
       <div id="detail"></div>`;

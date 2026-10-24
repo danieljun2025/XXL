@@ -1,0 +1,35 @@
+name: 问题/Bug
+description: 线上或本地出现的异常。
+labels: ["type:bug"]
+body:
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 严重程度
+      options:
+        - "S1 数据丢失/泄露、服务不可用（立即处理）"
+        - "S2 核心流程走不通（答题、出报告、兑换码）"
+        - "S3 部分功能异常，有办法绕过"
+        - "S4 外观或文案问题"
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: "1. ...\n2. ..."
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果 / 实际结果
+    validations: { required: true }
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      description: 网址（完整版/静态版）、浏览器、手机或电脑、发生时间
+  - type: textarea
+    id: extra
+    attributes:
+      label: 截图与其他信息
+      description: 不要贴入口令、查看密钥、完整邮箱。

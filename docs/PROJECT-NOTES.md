@@ -2,19 +2,22 @@
 
 > 最后更新：2026-10-24。这份文件记录从零做到上线的全过程、现状、关键决策和后续待办，下次继续时先读它。
 >
+> **产品管理体系见 [docs/product/README.md](product/README.md)**（战略、指标、路线图、优先级、流程、风险、模板、决策记录）；待办在 GitHub Issues，变更记录在根目录 `CHANGELOG.md`。
+>
 > 在新的 Claude 会话里继续时，可以直接说：「先读仓库 `docs/PROJECT-NOTES.md`，然后继续做 ……」。
 
 ## 1. 现状一览
 
 | 项目 | 地址 | 说明 |
 |---|---|---|
-| 首页清单 | `https://matchgamers.com/` | GitHub Pages，列出所有项目 |
-| 消消乐 | `https://matchgamers.com/game/xxl/` | 原来的小游戏，原样保留 |
+| 首页 | `https://matchgamers.com/` | GitHub Pages，职业锚测试介绍页，按钮指向完整版 |
 | 职业锚测试（完整版） | `https://anchor.matchgamers.com/` | Render 上的 Node 服务，结果保存在服务器，**主推这个** |
 | 职业锚测试（静态备用版） | `https://matchgamers.com/career-anchor/` | 纯前端，数据只在答题者浏览器里，首页不链接，**不用来卖** |
 | 管理后台 | `https://anchor.matchgamers.com/admin.html` | 需管理员口令 |
 | 统计报表 | `/report.html` | 只能从后台点链接进入 |
 | 兑换码管理 | `/codes.html` | 只能从后台点链接进入 |
+| 团队管理 | `/teams.html` | 只能从后台点链接进入；创建团队、团队码、团队报告码 |
+| 团队负责人报告 | `/team.html` | 负责人凭「团队报告码」查看本团队汇总，不需要管理员口令 |
 | 代码仓库 | `https://github.com/danieljun2025/XXL` | 主分支 `main` |
 
 二维码（指向完整版）：![二维码](images/qr-anchor.png)
@@ -27,7 +30,7 @@
 2. **开发完整版**：Node + SQLite 服务，40 题、8 个职业锚、报告、后台、导出 CSV、自动测试。
 3. **去掉邮件**：邮箱 + 自设「查看密钥」代替邮件验证；忘记密钥由管理员重置。
 4. **静态版**：为了能放 GitHub Pages，做了纯前端版（只填名字，不用后端），并加了「保存为图片」。
-5. **站点整合**：首页做成项目清单；消消乐移到 `/game/xxl/`；删掉重复/旧页面（`mvp.html`、`poc.html`）。
+5. **站点整合**：首页一度做成项目清单，消消乐移到 `/game/xxl/`；之后决定只保留职业锚测试，**消消乐已整体移除**（可从提交 824a4a4 之前的历史找回），首页改为介绍页。
 6. **域名与证书**：域名在 Cloudflare，4 条 A 记录 + `www` CNAME 指向 GitHub Pages（全部 DNS only）；GitHub Pages 自动签发 HTTPS 证书。
 7. **部署完整版到 Render**：用仓库里的 `render.yaml` + `Dockerfile`，Starter 档 + 1GB 磁盘；子域名 `anchor.matchgamers.com` 用 CNAME 指向 Render（DNS only）。
 8. **每页 10 题**：40 题分 4 页显示。
@@ -35,6 +38,8 @@
 10. **答题者报告可视化重做**：蓝色头部卡片、雷达图高亮、排名条形、优势/盲区/适合环境/建议四宫格；保存的长图同步成同一风格。
 11. **兑换码**：一次性码 + 通用码（可设有效时长和最多使用人数），后台管理页，默认不启用。
 12. **闲鱼上架规划**：见第 8 节。
+14. **产品管理体系**：`docs/product/`、Issue/PR 模板、CI、冒烟脚本、待办池（Issues #12–#26）、CHANGELOG、9 条 ADR。
+13. **团队码与分团队报告**：团队管理页、团队码、负责人报告页、成员知情同意、管理员报表按团队筛选。
 
 合并请求记录（均为 squash 合并到 `main`）：#1 完整版与静态版 · #2 首页清单 · #3 页面精简 · #4 每页 10 题 · #5 首页链接到子域名 · #6 报表独立页 · #7 报表可视化 · #8 报告可视化 · #9 兑换码。
 
@@ -49,7 +54,10 @@
 **管理员**（口令登录，口令只在 Render 的环境变量里）
 - 记录列表：搜索、筛选、分页、查看单人报告、导出 CSV、删除用户、重置查看密钥。
 - 统计报表：测试者/已完成/进行中/完成率/近 7 天/中位用时/重测人数；主职业锚分布；群体平均画像；近 30 天趋势；用时分布。
-- 兑换码：生成、复制、筛选、设置有效期、作废、导出。
+- 兑换码：生成、复制、筛选、设置有效期、作废、导出；可归属某个团队。
+- 团队：创建团队（可同时生成团队码），重新生成报告码，开关「负责人可看姓名」，关闭/重新开放，改名；统计报表可按团队筛选；记录列表和导出带团队列。
+
+**团队负责人**：打开 `/team.html`（或后台给的带 `#报告码` 的链接），输入「团队报告码」，只能看到本团队的汇总图表；完成人数不足 3 人时不显示汇总（保护隐私）；若管理员开启了「负责人可看姓名」，还会看到成员姓名和主职业锚。**成员用团队码开始时，会先看到一页说明负责人能看到什么，点「同意并开始」才会开始。**
 
 ![答题者报告（电脑）](images/report-desktop.png)
 ![答题者报告（手机）](images/report-mobile.png)
@@ -68,19 +76,20 @@
 | 题库 40 题 = 8 维度 × 5 题 | 沿用经典结构；每页 10 题只是显示方式，不是题数变化 |
 | 同时保留静态版 | 没有服务器时的备用；但无法汇总、无兑换码 |
 | 兑换码默认关闭 | 不影响线上现状，需要时再开 |
+| 团队负责人只看汇总，且人数不足 3 人不显示 | 保护成员隐私，避免从小样本反推个人；看姓名需管理员显式开启并告知成员 |
+| 表单里的码输入框只在有团队或启用兑换码时才出现 | 没有团队时线上页面和以前完全一样 |
 
 **计分规则**：每个维度 5 题得分（1–6）求和，加上「最认同的 3 句话」所属维度各加 4 分，再除以 5。所以最高分是 (30+12)/5 = **8.4**。主职业锚 = 得分最高者；并列都列；只有一个最高且第二名仅差 0.2 分以内时，也一并列出。
 
 ## 5. 目录结构
 
 ```
-index.html            首页清单（GitHub Pages）
-game/xxl/             消消乐
+index.html            首页介绍页（GitHub Pages）
 career-anchor/        静态备用版（由 tools/build-static.js 生成，勿手改）
-public/               完整版前端：index.html app.js style.css admin.* report.* codes.*
+public/               完整版前端：index.html app.js style.css admin.* report.* charts.js codes.* teams.* team.*
 server/               Node 服务：server.js db.js scoring.js data/(questions, anchors, config)
 tools/                build-static.js static-shim.js
-test/                 自动测试（node --test，共 31 个）
+test/                 自动测试（node --test，共 40 个）
 docs/                 本文档、早期设计 Prompt、images/
 Dockerfile render.yaml DEPLOY.md README.md
 ```
@@ -115,8 +124,10 @@ Dockerfile render.yaml DEPLOY.md README.md
 
 ## 9. 待办（按优先级）
 
+> 以 GitHub Issues（#12–#26）和 [docs/product/03-roadmap.md](product/03-roadmap.md) 为准，本节只是摘要，可能已过期。
+
 1. 决定何时启用兑换码，并生成第一批码。
-2. **团队码 + 分团队报表**：现在所有人的数据在同一个后台，卖团队版前需要加"团队"维度。
+2. ~~团队码 + 分团队报表~~（已完成，见第 3 节）；团队版交付流程和定价待定。
 3. 写闲鱼上架文案（标题、描述、自动回复、FAQ）和主图。
 4. 页面上补一页**隐私说明**（收集什么、怎么用、如何删除）和**退款说明**。
 5. 开启 Render 磁盘快照；确认 GitHub Pages 的 Enforce HTTPS 已勾选。
