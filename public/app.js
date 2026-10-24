@@ -184,69 +184,127 @@
   // ---------- 保存为图片（Canvas 自绘，无需外部库） ----------
   function drawReport(r) {
     const AN = S.cfg.anchors, order = S.cfg.order, MAX = S.cfg.top3Bonus ? 8.4 : 6;
-    const W = 1080, P = 64, CW = W - P * 2;
+    const W = 1080, P = 56, CW = W - P * 2;
     const FONT = '-apple-system,"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif';
-    const col = { bg: '#ffffff', text: '#1f2933', muted: '#667085', brand: '#2f6fed', line: '#e4e7ec', sel: '#e8f0fe' };
+    const col = { bg: '#ffffff', text: '#1f2933', muted: '#667085', brand: '#2f6fed', line: '#e4e7ec', sel: '#e8f0fe', good: '#12805c', warn: '#b45309', bar: '#9db8f5' };
     function layout(ctx, draw) {
-      let y = 0;
-      const wrap = (t, size, color, opt = {}) => {
-        const x = P + (opt.indent || 0), w = CW - (opt.indent || 0), lh = Math.round(size * 1.55);
-        ctx.font = `${opt.bold ? '700' : '400'} ${size}px ${FONT}`; ctx.fillStyle = color; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
-        let line = '';
-        for (const ch of t) {
-          if (ctx.measureText(line + ch).width > w && line) { if (draw) ctx.fillText(line, x, y); y += lh; line = ch; } else line += ch;
-        }
-        if (line) { if (draw) ctx.fillText(line, x, y); y += lh; }
+      const font = (size, bold) => `${bold ? '700' : '400'} ${size}px ${FONT}`;
+      const lines = (text, size, maxW, bold) => {
+        ctx.font = font(size, bold);
+        const out = []; let line = '';
+        for (const ch of text) { if (ctx.measureText(line + ch).width > maxW && line) { out.push(line); line = ch; } else line += ch; }
+        if (line) out.push(line);
+        return out;
       };
-      const bullets = (arr) => arr.forEach((t) => { if (draw) { ctx.fillStyle = col.brand; ctx.beginPath(); ctx.arc(P + 8, y + 21, 5, 0, 7); ctx.fill(); } wrap(t, 28, col.text, { indent: 28 }); });
-      if (draw) { ctx.fillStyle = col.bg; ctx.fillRect(0, 0, W, 99999); ctx.fillStyle = col.brand; ctx.fillRect(0, 0, W, 14); }
-      y = 70;
-      wrap(`${r.name} 的职业锚报告`, 44, col.brand, { bold: true });
-      wrap(`${r.name} · ${fmt(r.submittedAt)} · ${r.reportNo}`, 24, col.muted);
-      y += 24;
-      wrap('我的主职业锚', 30, col.muted);
-      wrap(r.primary.map((c) => AN[c].name).join(' · '), 66, col.text, { bold: true });
-      y += 16;
-      r.primary.forEach((c) => {
-        const a = AN[c];
-        if (draw) { ctx.fillStyle = col.sel; ctx.fillRect(P, y, CW, 2); }
-        y += 24;
-        wrap(`${a.name}（${a.en}）`, 32, col.brand, { bold: true });
-        wrap(a.definition, 28, col.text);
-        y += 10; wrap('核心动机', 28, col.muted, { bold: true }); wrap(a.motivation, 28, col.text);
-        y += 10; wrap('典型优势', 28, col.muted, { bold: true }); bullets(a.strengths);
-        y += 10; wrap('发展建议', 28, col.muted, { bold: true }); bullets(a.advice);
-        y += 20;
+      const txt = (str, x, y, size, color, bold, align) => { if (!draw) return; ctx.font = font(size, bold); ctx.fillStyle = color; ctx.textAlign = align || 'left'; ctx.textBaseline = 'top'; ctx.fillText(str, x, y); };
+      const block = (arr, x, y, size, color, lh, bold) => { arr.forEach((l, i) => txt(l, x, y + i * lh, size, color, bold)); return arr.length * lh; };
+      const rr = (x, y, w, h, rad, fill, stroke) => {
+        if (!draw) return;
+        ctx.beginPath(); ctx.moveTo(x + rad, y); ctx.arcTo(x + w, y, x + w, y + h, rad); ctx.arcTo(x + w, y + h, x, y + h, rad); ctx.arcTo(x, y + h, x, y, rad); ctx.arcTo(x, y, x + w, y, rad); ctx.closePath();
+        if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+        if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.stroke(); }
+      };
+      if (draw) { ctx.fillStyle = col.bg; ctx.fillRect(0, 0, W, 99999); }
+
+      // ---- 顶部大卡片 ----
+      const tiles = r.primary.map((c) => { const dl = lines(AN[c].definition, 24, CW - 56 - 76 - 170, false); return { c, dl, h: Math.max(112, 28 + 40 + dl.length * 32 + 24) }; });
+      const heroH = 52 + 34 + 70 + 44 + tiles.reduce((a, t) => a + t.h + 16, 0) + 36;
+      if (draw) { ctx.fillStyle = col.brand; ctx.fillRect(0, 0, W, heroH); }
+      txt(`${fmt(r.submittedAt)} · 报告编号 ${r.reportNo}`, P, 52, 24, 'rgba(255,255,255,.85)');
+      txt(`${r.name} 的职业锚报告`, P, 52 + 36, 54, '#ffffff', true);
+      txt(r.primary.length > 1 ? '你有两个并列突出的职业锚' : '你最突出的职业锚是', P, 52 + 34 + 70, 26, 'rgba(255,255,255,.9)');
+      let y = 52 + 34 + 70 + 44;
+      tiles.forEach((t) => {
+        rr(P, y, CW, t.h, 20, 'rgba(255,255,255,.16)');
+        rr(P + 24, y + (t.h - 84) / 2, 84, 84, 18, '#ffffff');
+        txt(t.c, P + 24 + 42, y + (t.h - 84) / 2 + 26, 34, col.brand, true, 'center');
+        txt(AN[t.c].name, P + 24 + 84 + 24, y + 24, 36, '#ffffff', true);
+        block(t.dl, P + 24 + 84 + 24, y + 24 + 46, 24, 'rgba(255,255,255,.92)', 32);
+        txt(r.scores[t.c].toFixed(1), W - P - 24, y + t.h / 2 - 28, 56, '#ffffff', true, 'right');
+        txt(`/ ${MAX}`, W - P - 24, y + t.h / 2 + 30, 22, 'rgba(255,255,255,.8)', false, 'right');
+        y += t.h + 16;
       });
-      if (draw) { ctx.fillStyle = col.sel; ctx.fillRect(P, y, CW, 2); }
-      y += 30;
-      wrap('八个维度得分', 34, col.text, { bold: true });
-      y += 20;
-      const R = 220, cx = W / 2, cy = y + R + 50;
+      y = heroH + 44;
+
+      // ---- 画像：雷达 + 排名 ----
+      txt('你的职业锚画像', P, y, 36, col.text, true); y += 52;
+      txt('越向外说明该动机对你越重要，加粗的是主职业锚', P, y, 24, col.muted); y += 44;
+      const R = 170, cx = P + 236, cy = y + R + 80;
       if (draw) {
-        const pt = (i, rr) => { const t = -Math.PI / 2 + (2 * Math.PI * i) / order.length; return [cx + rr * Math.cos(t), cy + rr * Math.sin(t)]; };
+        const pt = (i, rr_) => { const t = -Math.PI / 2 + (2 * Math.PI * i) / order.length; return [cx + rr_ * Math.cos(t), cy + rr_ * Math.sin(t)]; };
         ctx.strokeStyle = col.line; ctx.lineWidth = 2;
         [1 / 3, 2 / 3, 1].forEach((f) => { ctx.beginPath(); order.forEach((_, i) => { const [x, yy] = pt(i, R * f); i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy); }); ctx.closePath(); ctx.stroke(); });
         order.forEach((_, i) => { const [x, yy] = pt(i, R); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x, yy); ctx.stroke(); });
         ctx.beginPath();
         order.forEach((c, i) => { const [x, yy] = pt(i, (R * Math.min(r.scores[c], MAX)) / MAX); i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy); });
-        ctx.closePath(); ctx.fillStyle = 'rgba(47,111,237,.25)'; ctx.fill(); ctx.strokeStyle = col.brand; ctx.lineWidth = 4; ctx.stroke();
-        ctx.fillStyle = col.text; ctx.font = `400 26px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        order.forEach((c, i) => { const [x, yy] = pt(i, R + 46); ctx.fillText(AN[c].name.replace('型', ''), x, yy); });
+        ctx.closePath(); ctx.fillStyle = 'rgba(47,111,237,.22)'; ctx.fill(); ctx.strokeStyle = col.brand; ctx.lineWidth = 4; ctx.stroke();
+        order.forEach((c, i) => {
+          const [x, yy] = pt(i, (R * Math.min(r.scores[c], MAX)) / MAX), main = r.primary.includes(c);
+          ctx.beginPath(); ctx.arc(x, yy, main ? 9 : 5, 0, 7); ctx.fillStyle = col.brand; ctx.globalAlpha = main ? 1 : 0.6; ctx.fill(); ctx.globalAlpha = 1;
+          if (main) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke(); }
+          const [lx, ly] = pt(i, R + 46);
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.font = font(24, main); ctx.fillStyle = main ? col.text : col.muted; ctx.fillText(AN[c].name.replace('型', ''), lx, ly - 12);
+          ctx.font = font(22, main); ctx.fillStyle = main ? col.brand : col.muted; ctx.fillText(r.scores[c].toFixed(1), lx, ly + 14);
+        });
       }
-      y = cy + R + 90;
-      r.ranking.forEach((c) => {
-        if (draw) {
-          ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.font = `400 28px ${FONT}`; ctx.fillStyle = col.text; ctx.fillText(AN[c].name, P, y);
-          ctx.fillStyle = col.line; ctx.fillRect(P + 280, y + 10, 560, 16);
-          ctx.fillStyle = r.primary.includes(c) ? col.brand : '#9db8f5'; ctx.fillRect(P + 280, y + 10, (560 * Math.min(r.scores[c], MAX)) / MAX, 16);
-          ctx.fillStyle = col.text; ctx.textAlign = 'right'; ctx.fillText(r.scores[c].toFixed(1), W - P, y);
-        }
-        y += 48;
+      const rx = 590, rw = W - P - rx, rowH = 56;
+      r.ranking.forEach((c, i) => {
+        const ry = y + 20 + i * rowH, main = r.primary.includes(c);
+        if (main) rr(rx - 12, ry - 6, rw + 24, rowH - 4, 12, col.sel);
+        txt(String(i + 1), rx, ry + 8, 24, col.muted);
+        txt(AN[c].name, rx + 40, ry + 6, 26, col.text, main);
+        if (draw) { rr(rx + 230, ry + 14, 130, 14, 4, col.line); rr(rx + 230, ry + 14, Math.max(8, (130 * Math.min(r.scores[c], MAX)) / MAX), 14, 4, main ? col.brand : col.bar); }
+        txt(r.scores[c].toFixed(1), rx + rw, ry + 6, 26, col.text, main, 'right');
       });
-      y += 30;
-      wrap('本测评基于 Schein 职业锚理论，仅作为自我认知参考，不构成录用、诊断或其他决策依据。', 22, col.muted);
-      y += 50;
+      y = Math.max(cy + R + 96, y + 20 + 8 * rowH) + 24;
+      txt(`分数 = 该维度 5 题均分${S.cfg.top3Bonus ? '，你最认同的 3 句话所属维度各加 0.8 分' : ''}`, P, y, 22, col.muted); y += 64;
+
+      // ---- 主职业锚详解 ----
+      const colW = (CW - 24) / 2;
+      r.primary.forEach((c) => {
+        const a = AN[c];
+        txt(a.name, P, y, 40, col.text, true);
+        if (draw) { ctx.font = font(40, true); const w = ctx.measureText(a.name).width; txt(a.en, P + w + 16, y + 14, 22, col.muted); }
+        y += 64;
+        const ml = lines(a.motivation, 28, CW - 56, false);
+        const mh = 22 + 30 + ml.length * 40 + 18;
+        rr(P, y, CW, mh, 16, col.sel);
+        txt('核心动机', P + 28, y + 18, 22, col.brand, true);
+        block(ml, P + 28, y + 18 + 32, 28, col.text, 40);
+        y += mh + 20;
+        const boxes = [['典型优势', a.strengths, col.good, col.good], ['潜在盲区', a.blindspots, col.warn, col.warn], ['适合的岗位与环境', a.fit, col.text, col.brand], ['发展建议', a.advice, col.text, col.brand]];
+        const prep = boxes.map(([t, items, tc, dc]) => { const its = items.map((it) => lines(it, 25, colW - 28 - 44, false)); return { t, its, tc, dc, h: 20 + 40 + its.reduce((s, l) => s + l.length * 36 + 8, 0) + 14 }; });
+        for (let row = 0; row < 2; row++) {
+          const pair = prep.slice(row * 2, row * 2 + 2), rh = Math.max(...pair.map((b) => b.h));
+          pair.forEach((b, k) => {
+            const bx = P + k * (colW + 24);
+            rr(bx, y, colW, rh, 16, null, col.line);
+            txt(b.t, bx + 24, y + 18, 26, b.tc, true);
+            let iy = y + 18 + 42;
+            b.its.forEach((l) => { if (draw) { ctx.beginPath(); ctx.arc(bx + 30, iy + 17, 5, 0, 7); ctx.fillStyle = b.dc; ctx.fill(); } block(l, bx + 44, iy, 25, col.text, 36); iy += l.length * 36 + 8; });
+          });
+          y += rh + 16;
+        }
+        const al = lines('不太适合：' + a.avoid.join('；'), 24, CW, false);
+        y += block(al, P, y + 4, 24, col.muted, 34) + 56;
+      });
+
+      // ---- 次要职业锚 ----
+      const sec = r.ranking.filter((c) => !r.primary.includes(c)).slice(0, 2);
+      txt('次要职业锚', P, y, 34, col.text, true); y += 56;
+      const sp = sec.map((c) => ({ c, dl: lines(AN[c].definition, 24, colW - 48, false) }));
+      const sh = Math.max(...sp.map((o) => 18 + 40 + o.dl.length * 34 + 20));
+      sp.forEach((o, k) => {
+        const bx = P + k * (colW + 24);
+        rr(bx, y, colW, sh, 16, null, col.line);
+        txt(AN[o.c].name, bx + 24, y + 18, 28, col.text, true);
+        txt(r.scores[o.c].toFixed(1), bx + colW - 24, y + 18, 28, col.brand, true, 'right');
+        block(o.dl, bx + 24, y + 18 + 42, 24, col.muted, 34);
+      });
+      y += sh + 44;
+      const dis = lines('本测评基于 Schein 职业锚理论，仅作为自我认知参考，不构成录用、诊断或其他决策依据。', 22, CW, false);
+      y += block(dis, P, y, 22, col.muted, 32) + 48;
       return y;
     }
     const probe = document.createElement('canvas').getContext('2d');
