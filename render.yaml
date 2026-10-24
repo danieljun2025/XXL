@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: career-anchor
+    runtime: docker
+    plan: starter          # 持久磁盘需要付费实例
+    healthCheckPath: /
+    envVars:
+      - key: ADMIN_PASSWORD
+        sync: false        # 在 Render 控制台填写，不要写进仓库
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
