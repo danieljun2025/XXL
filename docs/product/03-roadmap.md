@@ -13,7 +13,7 @@
 | 2 | 隐私说明页与删除流程 | [#12](https://github.com/danieljun2025/XXL/issues/12) | 页面上线，表单与同意页有链接 |
 | 3 | 服务说明与退款规则 | [#13](https://github.com/danieljun2025/XXL/issues/13) | 页面上线，文案与商品描述一致 |
 | 4 | 启用兑换码：清单与首批码 | [#15](https://github.com/danieljun2025/XXL/issues/15) | `REQUIRE_CODE=1`，完整验证通过，可一键回退 |
-| 5 | 闲鱼上架包 | [#16](https://github.com/danieljun2025/XXL/issues/16) | 三条商品文案、自动回复、主图就绪 |
+| 5 | 闲鱼上架包（草稿见 [launch/xianyu-listing-pack.md](launch/xianyu-listing-pack.md)） | [#16](https://github.com/danieljun2025/XXL/issues/16) | 三条商品文案、自动回复、主图就绪并上架 |
 
 WIP 限制 2：同时只推进两项，其余排队。
 
@@ -24,6 +24,8 @@ WIP 限制 2：同时只推进两项，其余排队。
 | 卡密导出（闲鱼自动发货） | [#19](https://github.com/danieljun2025/XXL/issues/19) | 降低发码的人工成本 |
 | 转化漏斗埋点 | [#18](https://github.com/danieljun2025/XXL/issues/18) | 知道用户在哪里流失 |
 | 解读版交付流程 | [#20](https://github.com/danieljun2025/XXL/issues/20) | 把利润来源标准化 |
+| 小红书渠道（作战手册见 [launch/xiaohongshu-playbook.md](launch/xiaohongshu-playbook.md)） | [#29](https://github.com/danieljun2025/XXL/issues/29) | 获客与信任，导向闲鱼成交 |
+| 渠道归因（渠道码 / 来源参数） | [#30](https://github.com/danieljun2025/XXL/issues/30) | 知道哪个渠道带来完成的测试 |
 | 团队版定价与交付 SOP | [#21](https://github.com/danieljun2025/XXL/issues/21) | 让已开发的团队功能能卖出去 |
 
 ## Later（观察与储备）
