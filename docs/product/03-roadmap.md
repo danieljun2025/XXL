@@ -24,8 +24,8 @@ WIP 限制 2：同时只推进两项，其余排队。
 | 卡密导出（闲鱼自动发货） | [#19](https://github.com/danieljun2025/XXL/issues/19) | 降低发码的人工成本 |
 | 转化漏斗埋点 | [#18](https://github.com/danieljun2025/XXL/issues/18) | 知道用户在哪里流失 |
 | 解读版交付流程 | [#20](https://github.com/danieljun2025/XXL/issues/20) | 把利润来源标准化 |
-| 小红书渠道（作战手册见 [launch/xiaohongshu-playbook.md](launch/xiaohongshu-playbook.md)） | [#29](https://github.com/danieljun2025/XXL/issues/29) | 获客与信任，导向闲鱼成交 |
-| 渠道归因（渠道码 / 来源参数） | [#30](https://github.com/danieljun2025/XXL/issues/30) | 知道哪个渠道带来完成的测试 |
+| 先在 App 内核对规则、起业务号 | [platform-rules-check.md](launch/platform-rules-check.md) | 上架和发帖前的前置动作 |
+| 小红书内容渠道（作战手册见 [launch/xiaohongshu-playbook.md](launch/xiaohongshu-playbook.md)） | [#29](https://github.com/danieljun2025/XXL/issues/29) | 品牌与信任，独立运营，不导流 |
 | 团队版定价与交付 SOP | [#21](https://github.com/danieljun2025/XXL/issues/21) | 让已开发的团队功能能卖出去 |
 
 ## Later（观察与储备）

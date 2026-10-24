@@ -46,7 +46,7 @@
 | [#20](https://github.com/danieljun2025/XXL/issues/20) | 解读版交付流程 | 20 | 2 | 50% | 1 | **20** | P1 | 铺垫（利润来源） |
 | [#21](https://github.com/danieljun2025/XXL/issues/21) | 团队版定价与交付 SOP | 20 | 2 | 50% | 1 | **20** | P1 | 铺垫（已开发团队功能） |
 | [#29](https://github.com/danieljun2025/XXL/issues/29) | 小红书渠道 | 100 | 2 | 50% | 3 | **33** | P1 | 铺垫（获客） |
-| [#30](https://github.com/danieljun2025/XXL/issues/30) | 渠道归因 | 100 | 1 | 60% | 1 | **60** | P2 | — |
+| [#30](https://github.com/danieljun2025/XXL/issues/30) | 渠道归因（暂缓：没有合规的跨平台导流链路） | 100 | 1 | 60% | 1 | **60** | P3 | — |
 | [#25](https://github.com/danieljun2025/XXL/issues/25) | 题目评审与测评说明 | 100 | 1 | 50% | 3 | **17** | P2 | — |
 | [#26](https://github.com/danieljun2025/XXL/issues/26) | 英文版 | 10 | 1 | 50% | 5 | **1** | P3 | — |
 
