@@ -1,17 +1,17 @@
 # 部署说明
 
 ## A. 纯静态版（当前上线方式，GitHub Pages）
-根目录的 `index.html` 是一个独立文件：只需输入名字即可答题，报告显示名字，可「保存为图片」或打印。
+`career-anchor/index.html` 是一个独立文件（访问路径：`/career-anchor/`）：只需输入名字即可答题，报告显示名字，可「保存为图片」或打印。
 数据只存在答题者自己设备的浏览器里，不上传、没有后台。
 
 1. 合并分支到主分支（`main`）。
 2. 仓库 Settings → Pages → Source 选 `Deploy from a branch`，Branch 选 `main` / `(root)`。
 3. 根目录的 `CNAME` 文件决定自定义域名（当前为 `matchgamers.com`），按需修改并在域名解析处配置。
-4. 原消消乐在 `/game/`。
+4. 网站首页 `/` 仍是原来的消消乐，职业锚测试在 `/career-anchor/`。
 
 修改题目或文案后，重新生成页面再提交：
 ```bash
-npm run build:static   # 生成根目录 index.html
+npm run build:static   # 生成 career-anchor/index.html
 ```
 
 ## B. 带后端的完整版（以后需要汇总全员结果时）

@@ -17,7 +17,7 @@ npm test
 - 身份：姓名 + 邮箱 + 自设查看密钥（scrypt 加盐哈希）。回访需「邮箱 + 密钥」；连续错 5 次锁 15 分钟；忘记密钥由后台重置。
 - 每次作答题序随机（种子入库），每题自动保存草稿，可断点续答；计分在服务端完成。
 - 题目与解读在 `server/data/questions.json`、`anchors.json`，参数在 `config.json`（`top3Bonus`、`pageSize` 等）。
-- 原消消乐已移至 `public/game/`。
+- 纯静态版（GitHub Pages）见 `career-anchor/`，由 `npm run build:static` 生成；网站首页仍是消消乐。
 
 ## 已知取舍
 - 先注册某邮箱者先占有它（无邮件验证）；被他人占用时由管理员重置/删除。

@@ -1,5 +1,5 @@
 'use strict';
-// 生成纯静态版 index.html（无需后端，可直接放 GitHub Pages）。运行：npm run build:static
+// 生成纯静态版 career-anchor/index.html（无需后端，可直接放 GitHub Pages）。运行：npm run build:static
 const fs = require('node:fs');
 const path = require('node:path');
 const root = path.join(__dirname, '..');
@@ -39,5 +39,5 @@ ${read('public/app.js')}
 </body>
 </html>
 `;
-fs.writeFileSync(path.join(root, 'index.html'), html);
-console.log('已生成 index.html', Math.round(html.length / 1024) + ' KB');
+fs.writeFileSync(path.join(root, 'career-anchor', 'index.html'), html);
+console.log('已生成 career-anchor/index.html', Math.round(html.length / 1024) + ' KB');
