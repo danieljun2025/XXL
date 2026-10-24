@@ -5,7 +5,8 @@
   "description": "职业锚在线测试（零依赖，Node 22+）",
   "scripts": {
     "start": "node server/server.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "build:static": "node tools/build-static.js"
   },
   "engines": { "node": ">=22.5" }
 }

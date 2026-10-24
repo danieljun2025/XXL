@@ -117,7 +117,7 @@ test('管理后台：口令保护、列表、统计、导出、重置密钥、�
 });
 
 test('静态资源与路径穿越', async () => {
-  assert.equal((await call('GET', '/game/index.html')).status, 200);
+  assert.equal((await call('GET', '/')).status, 200);
   assert.ok([403, 404].includes((await call('GET', '/%2e%2e/server/server.js')).status));
   assert.equal((await call('GET', '/..%2fserver%2fserver.js')).status, 403);
   assert.equal((await call('GET', '/api/nothing')).status, 404);

@@ -20,6 +20,23 @@
 
   // ---------- 入口 ----------
   function renderEnter(msg) {
+    if (window.CA_STATIC) {
+      view(`<div class="card"><h1>职业锚测试</h1>
+        <p class="muted">共 40 题，约 10 分钟。完成后立即生成你的职业锚报告，报告上会显示你的名字，并可保存为图片。</p>
+        <form id="f" autocomplete="off"><label for="name">你的名字</label><input id="name" type="text" maxlength="30" required>
+        <div class="err" id="err" role="alert">${esc(msg || '')}</div>
+        <div class="row"><button type="submit">开始测试</button></div></form></div>`);
+      $('#f').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type=submit]'); btn.disabled = true;
+        try {
+          const r = await api('POST', '/api/enter', { name: $('#name').value });
+          setToken(r.token); S.name = r.name; S.attempts = r.attempts;
+          await afterLogin();
+        } catch (er) { btn.disabled = false; $('#err').textContent = er.message; }
+      });
+      return;
+    }
     const isNew = S.mode === 'new';
     view(`<div class="card">
       <h1>职业锚测试</h1>
@@ -162,11 +179,103 @@
   }
   const list = (arr) => `<ul class="tag-list">${arr.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
 
+  // ---------- 保存为图片（Canvas 自绘，无需外部库） ----------
+  function drawReport(r) {
+    const AN = S.cfg.anchors, order = S.cfg.order, MAX = S.cfg.top3Bonus ? 8 : 6;
+    const W = 1080, P = 64, CW = W - P * 2;
+    const FONT = '-apple-system,"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif';
+    const col = { bg: '#ffffff', text: '#1f2933', muted: '#667085', brand: '#2f6fed', line: '#e4e7ec', sel: '#e8f0fe' };
+    function layout(ctx, draw) {
+      let y = 0;
+      const wrap = (t, size, color, opt = {}) => {
+        const x = P + (opt.indent || 0), w = CW - (opt.indent || 0), lh = Math.round(size * 1.55);
+        ctx.font = `${opt.bold ? '700' : '400'} ${size}px ${FONT}`; ctx.fillStyle = color; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+        let line = '';
+        for (const ch of t) {
+          if (ctx.measureText(line + ch).width > w && line) { if (draw) ctx.fillText(line, x, y); y += lh; line = ch; } else line += ch;
+        }
+        if (line) { if (draw) ctx.fillText(line, x, y); y += lh; }
+      };
+      const bullets = (arr) => arr.forEach((t) => { if (draw) { ctx.fillStyle = col.brand; ctx.beginPath(); ctx.arc(P + 8, y + 21, 5, 0, 7); ctx.fill(); } wrap(t, 28, col.text, { indent: 28 }); });
+      if (draw) { ctx.fillStyle = col.bg; ctx.fillRect(0, 0, W, 99999); ctx.fillStyle = col.brand; ctx.fillRect(0, 0, W, 14); }
+      y = 70;
+      wrap(`${r.name} 的职业锚报告`, 44, col.brand, { bold: true });
+      wrap(`${r.name} · ${fmt(r.submittedAt)} · ${r.reportNo}`, 24, col.muted);
+      y += 24;
+      wrap('我的主职业锚', 30, col.muted);
+      wrap(r.primary.map((c) => AN[c].name).join(' · '), 66, col.text, { bold: true });
+      y += 16;
+      r.primary.forEach((c) => {
+        const a = AN[c];
+        if (draw) { ctx.fillStyle = col.sel; ctx.fillRect(P, y, CW, 2); }
+        y += 24;
+        wrap(`${a.name}（${a.en}）`, 32, col.brand, { bold: true });
+        wrap(a.definition, 28, col.text);
+        y += 10; wrap('核心动机', 28, col.muted, { bold: true }); wrap(a.motivation, 28, col.text);
+        y += 10; wrap('典型优势', 28, col.muted, { bold: true }); bullets(a.strengths);
+        y += 10; wrap('发展建议', 28, col.muted, { bold: true }); bullets(a.advice);
+        y += 20;
+      });
+      if (draw) { ctx.fillStyle = col.sel; ctx.fillRect(P, y, CW, 2); }
+      y += 30;
+      wrap('八个维度得分', 34, col.text, { bold: true });
+      y += 20;
+      const R = 220, cx = W / 2, cy = y + R + 50;
+      if (draw) {
+        const pt = (i, rr) => { const t = -Math.PI / 2 + (2 * Math.PI * i) / order.length; return [cx + rr * Math.cos(t), cy + rr * Math.sin(t)]; };
+        ctx.strokeStyle = col.line; ctx.lineWidth = 2;
+        [1 / 3, 2 / 3, 1].forEach((f) => { ctx.beginPath(); order.forEach((_, i) => { const [x, yy] = pt(i, R * f); i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy); }); ctx.closePath(); ctx.stroke(); });
+        order.forEach((_, i) => { const [x, yy] = pt(i, R); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x, yy); ctx.stroke(); });
+        ctx.beginPath();
+        order.forEach((c, i) => { const [x, yy] = pt(i, (R * Math.min(r.scores[c], MAX)) / MAX); i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy); });
+        ctx.closePath(); ctx.fillStyle = 'rgba(47,111,237,.25)'; ctx.fill(); ctx.strokeStyle = col.brand; ctx.lineWidth = 4; ctx.stroke();
+        ctx.fillStyle = col.text; ctx.font = `400 26px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        order.forEach((c, i) => { const [x, yy] = pt(i, R + 46); ctx.fillText(AN[c].name.replace('型', ''), x, yy); });
+      }
+      y = cy + R + 90;
+      r.ranking.forEach((c) => {
+        if (draw) {
+          ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.font = `400 28px ${FONT}`; ctx.fillStyle = col.text; ctx.fillText(AN[c].name, P, y);
+          ctx.fillStyle = col.line; ctx.fillRect(P + 280, y + 10, 560, 16);
+          ctx.fillStyle = r.primary.includes(c) ? col.brand : '#9db8f5'; ctx.fillRect(P + 280, y + 10, (560 * Math.min(r.scores[c], MAX)) / MAX, 16);
+          ctx.fillStyle = col.text; ctx.textAlign = 'right'; ctx.fillText(r.scores[c].toFixed(1), W - P, y);
+        }
+        y += 48;
+      });
+      y += 30;
+      wrap('本测评基于 Schein 职业锚理论，仅作为自我认知参考，不构成录用、诊断或其他决策依据。', 22, col.muted);
+      y += 50;
+      return y;
+    }
+    const probe = document.createElement('canvas').getContext('2d');
+    const H = layout(probe, false);
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    layout(c.getContext('2d'), true);
+    return c;
+  }
+
+  function saveImage(r) {
+    const c = drawReport(r);
+    c.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `职业锚报告-${r.name.replace(/[\\/:*?"<>|]/g, '')}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      let box = $('#preview');
+      if (!box) { box = document.createElement('div'); box.id = 'preview'; box.className = 'card noprint'; app.appendChild(box); }
+      box.innerHTML = '<p class="muted">图片已生成。如果没有自动下载，请长按（电脑上右键）下面的图片，选择"保存图片"。</p><img alt="职业锚报告图片" style="width:100%;border:1px solid var(--line);border-radius:8px">';
+      box.querySelector('img').src = url;
+      box.scrollIntoView({ behavior: 'smooth' });
+    }, 'image/png');
+  }
+
   function renderResult(r) {
     const AN = S.cfg.anchors, order = S.cfg.order, MAX = S.cfg.top3Bonus ? 8 : 6;
     const sec = r.ranking.filter((c) => !r.primary.includes(c)).slice(0, 2);
     view(`<div class="card hero"><p class="muted">${esc(r.name)} · ${fmt(r.submittedAt)} · 报告编号 ${esc(r.reportNo)}</p>
-      <h1>你的主职业锚：${r.primary.map((c) => esc(AN[c].name)).join('、')}</h1>
+      <h1>${esc(r.name)} 的职业锚报告</h1>
+      <p><b>主职业锚：${r.primary.map((c) => esc(AN[c].name)).join('、')}</b></p>
       ${r.primary.map((c) => `<p><span class="badge">${esc(c)}</span>${esc(AN[c].definition)}</p>`).join('')}</div>
       ${r.primary.map((c) => `<div class="card"><h2>${esc(AN[c].name)}（${esc(AN[c].en)}）</h2>
         <h3>核心动机</h3><p>${esc(AN[c].motivation)}</p><h3>典型优势</h3>${list(AN[c].strengths)}<h3>潜在盲区</h3>${list(AN[c].blindspots)}
@@ -176,8 +285,9 @@
         <p class="muted">分数越高表示该动机对你越重要（题目均分 1–6；你选出的 3 句话所属维度各加 0.8 分，因此最高可达 8.4）。</p></div>
       <div class="card"><h2>次要职业锚</h2>${sec.map((c) => `<p><b>${esc(AN[c].name)}</b>：${esc(AN[c].definition)}</p>`).join('')}</div>
       <div class="card muted">本测评基于 Schein 职业锚理论，仅作为自我认知参考，不构成录用、诊断或其他决策依据。</div>
-      <div class="row noprint"><button id="print">打印 / 保存为 PDF</button><button class="ghost" id="home">我的记录</button><button class="ghost" id="out">退出</button></div>`);
+      <div class="row noprint"><button id="save">保存为图片</button><button class="ghost" id="print">打印 / 保存为 PDF</button><button class="ghost" id="home">我的记录</button><button class="ghost" id="out">退出</button></div>`);
     $('#print').addEventListener('click', () => window.print());
+    $('#save').addEventListener('click', () => saveImage(r));
     $('#home').addEventListener('click', async () => { S.attempts = (await api('GET', '/api/me')).attempts; renderHome(); });
     $('#out').addEventListener('click', logout);
   }
