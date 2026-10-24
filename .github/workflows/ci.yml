@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 自动测试
+        run: npm test
+      - name: 静态备用版是否为最新生成
+        run: |
+          npm run build:static
+          git diff --exit-code -- career-anchor/index.html || (echo "career-anchor/index.html 不是最新的，请运行 npm run build:static 后提交" && exit 1)

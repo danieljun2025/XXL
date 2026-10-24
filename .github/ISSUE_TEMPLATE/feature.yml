@@ -1,0 +1,51 @@
+name: 功能需求
+description: 新功能或改进。先写问题，再谈方案。
+labels: ["type:feature"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题
+      description: 谁（用户/买家/你自己）在什么场景下遇到什么问题？证据是什么（反馈原话、数据）？
+    validations: { required: true }
+  - type: textarea
+    id: goal
+    attributes:
+      label: 目标与成功指标
+      description: 怎么知道做成了？指标的定义、基线、目标值。
+    validations: { required: true }
+  - type: textarea
+    id: scope
+    attributes:
+      label: 范围与不做的事
+    validations: { required: true }
+  - type: textarea
+    id: ac
+    attributes:
+      label: 验收标准
+      description: 一条一条、可测试的。
+      placeholder: "- [ ] ..."
+    validations: { required: true }
+  - type: dropdown
+    id: size
+    attributes:
+      label: 级别
+      options: ["S 小（<0.5 天，不动数据）", "M 中", "L 大（涉及个人信息/权限/数据库/收费，需要需求文档）"]
+    validations: { required: true }
+  - type: input
+    id: rice
+    attributes:
+      label: RICE（Reach × Impact × Confidence ÷ Effort）
+      description: 写出每个因子和结果，见 docs/product/04-prioritization.md
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 隐私与合规
+      options:
+        - label: 不涉及新增或展示个人信息
+        - label: 涉及个人信息，已在需求里写明告知、最小展示和删除方式
+  - type: textarea
+    id: rollout
+    attributes:
+      label: 发布与回退
+      description: 开关名称与默认值；怎么退回。
