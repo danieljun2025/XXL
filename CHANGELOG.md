@@ -3,6 +3,11 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。题库或解读文案变更也要记录在这里。
 
 ## [Unreleased]
+### 新增
+- `npm run verify:codes -- <网址>`：兑换码启用后的端到端验证脚本（用完自动清理验证数据）；自动测试里也会运行它
+- 管理接口 `GET /api/admin/participants`：按姓名/邮箱列出所有用户，包括只注册、还没有答题记录的
+### 文档
+- 《启用兑换码：上线清单》`docs/product/launch/enable-redeem-codes.md`：先用长期通用码软启动，有订单后切换到一次性码（#15）
 
 ## [1.3.0] - 2026-10-24
 ### 新增

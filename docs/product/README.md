@@ -24,6 +24,7 @@
 | [05-process.md](05-process.md) | 怎么开发、发布、回退、运维 | 有变化时 |
 | [06-risks-and-compliance.md](06-risks-and-compliance.md) | 有哪些风险和合规要求 | 每月 |
 | [07-support-and-feedback.md](07-support-and-feedback.md) | 客户问题和反馈怎么处理、怎么进入产品 | 每周 |
+| [launch/](launch/enable-redeem-codes.md) | 重要能力上线前的检查清单（兑换码启用） | 上线时 |
 | [templates/](templates/) | 需求文档、决策记录、发布清单、复盘、实验模板 | 使用时 |
 | [decisions/](decisions/) | 已做出的关键决策（ADR）和理由 | 有新决策时 |
 | [specs/](specs/) | 已做功能的需求文档（含补写的） | 每个中大型需求一份 |

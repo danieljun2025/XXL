@@ -461,6 +461,13 @@ function createApp(opts = {}) {
         const rows = db.prepare(`SELECT a.id,p.id pid,p.name,p.email,a.status,a.primary_anchors,a.scores,a.started_at,a.submitted_at,tm.name teamName FROM attempts a JOIN participants p ON p.id=a.participant_id LEFT JOIN teams tm ON tm.id=a.team_id ${W} ORDER BY a.id DESC LIMIT ? OFFSET ?`).all(...args, size, (page - 1) * size);
         return send(res, 200, { total, page, size, rows: rows.map((r) => ({ id: r.id, participantId: r.pid, name: r.name, email: r.email, status: r.status, primary: r.primary_anchors ? JSON.parse(r.primary_anchors) : null, scores: r.scores ? JSON.parse(r.scores) : null, startedAt: r.started_at, submittedAt: r.submitted_at, team: r.teamName })) });
       }
+      // 注册了但还没有答题记录的用户在记录列表里看不到，这里按姓名/邮箱列出所有用户
+      if (p === '/api/admin/participants' && method === 'GET') {
+        const kw = (url.searchParams.get('q') || '').trim().toLowerCase();
+        const like = '%' + kw.replace(/[\\%_]/g, '\\$&') + '%';
+        const rows = db.prepare(`SELECT p.id,p.name,p.email,p.created_at,(SELECT COUNT(*) FROM attempts a WHERE a.participant_id=p.id) attempts FROM participants p ${kw ? "WHERE lower(p.name) LIKE ? ESCAPE '\\' OR p.email_norm LIKE ? ESCAPE '\\'" : ''} ORDER BY p.id DESC LIMIT 100`).all(...(kw ? [like, like] : []));
+        return send(res, 200, { rows: rows.map((r) => ({ id: r.id, name: r.name, email: r.email, attempts: r.attempts, createdAt: r.created_at })) });
+      }
       // 数据库备份：服务端生成一致性副本（VACUUM INTO），去掉登录会话后下载；备份里密钥只有哈希
       if (method === 'GET' && p === '/api/admin/backup') {
         if (!limit('backup', 20, 3600_000)) throw new HttpError(429, '备份下载过于频繁，请稍后再试');

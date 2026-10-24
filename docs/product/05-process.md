@@ -64,7 +64,7 @@
 | 变量 | 默认 | 作用 | 回退 |
 |---|---|---|---|
 | `ADMIN_PASSWORD` | 无（后台关闭） | 管理后台口令 | 在 Render 里改 |
-| `REQUIRE_CODE` | 关 | `1` 时开始新测试需要兑换码 | 删除或改 `0` |
+| `REQUIRE_CODE` | 关 | `1` 时开始新测试需要兑换码（启用清单见 [launch/enable-redeem-codes.md](launch/enable-redeem-codes.md)） | 删除或改 `0` |
 | `TRUST_PROXY` | 镜像内为 `1` | 反向代理后取真实 IP | — |
 | `DB_PATH` | `/data/career-anchor.db` | 数据库位置 | — |
 | `teamMinGroup`（配置文件） | 3 | 团队汇总最少完成人数 | 改配置文件并发布 |
