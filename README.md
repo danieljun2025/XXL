@@ -1,5 +1,7 @@
 # 职业锚在线测试
 
+项目全过程、现状、决策与待办见 [docs/PROJECT-NOTES.md](docs/PROJECT-NOTES.md)。
+
 基于 Schein 职业锚理论的 40 题测评。零依赖（需要 Node 22.5+，使用内置 `node:sqlite`）。
 
 ## 运行
