@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>兑换码管理</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="/style.css">
+<style>
+.wrap{max-width:1000px}.crumb a{color:var(--brand);text-decoration:none}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0;min-width:0}
+.panel h2{margin:0 0 10px;font-size:1.05rem}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+.kpis div{background:var(--bg);padding:10px 12px;border-radius:10px;font-size:.88rem;color:var(--muted)}
+.kpis b{display:block;font-size:1.5rem;color:var(--text);font-variant-numeric:tabular-nums}
+.gen{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.gen label{margin:0}.gen input{width:auto}
+#cnt,#hrs,#mu,#cc,#note{padding:11px 12px;font-size:1rem;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);max-width:100%}#cnt,#hrs,#mu{width:9em}#cc{width:13em}#note{width:15em}
+.tabs{max-width:28em}.bigcode{font-size:2rem;font-weight:700;letter-spacing:.12em;margin:6px 0;color:var(--brand)}
+textarea{width:100%;min-height:9em;font:1rem/1.6 ui-monospace,Menlo,Consolas,monospace;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text)}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:.04em}
+.pill{display:inline-block;padding:1px 10px;border-radius:99px;font-size:.8rem}
+.pill.unused{background:var(--sel);color:var(--brand)}.pill.used{background:var(--bg);color:var(--muted)}.pill.void{background:var(--bg);color:var(--err);text-decoration:line-through}
+td button{padding:4px 10px;font-size:.85rem;margin-right:4px}
+.tw{overflow-x:auto}select{padding:10px;border-radius:10px;background:var(--bg);color:var(--text);border:1px solid var(--line)}
+.ok{color:var(--ok)}
+</style>
+</head>
+<body><main id="app" class="wrap"></main><script src="/codes.js"></script></body>
+</html>

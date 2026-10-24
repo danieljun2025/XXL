@@ -71,3 +71,4 @@ table{width:100%;border-collapse:collapse}th,td{padding:8px 6px;border-bottom:1p
 .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media (max-width:640px){.sgrid{grid-template-columns:1fr}}
 .sbox{border:1px solid var(--line);border-radius:12px;padding:12px 14px}.sbox p{margin:.3em 0 0;font-size:.92rem;color:var(--muted)}
 .sh{display:flex;justify-content:space-between;align-items:baseline}.sh span{font-weight:700;color:var(--brand);font-variant-numeric:tabular-nums}
+h1:focus,h2:focus{outline:none}

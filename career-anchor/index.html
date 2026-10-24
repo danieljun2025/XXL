@@ -79,6 +79,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:8px 6px;border-bottom:1p
 .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media (max-width:640px){.sgrid{grid-template-columns:1fr}}
 .sbox{border:1px solid var(--line);border-radius:12px;padding:12px 14px}.sbox p{margin:.3em 0 0;font-size:.92rem;color:var(--muted)}
 .sh{display:flex;justify-content:space-between;align-items:baseline}.sh span{font-weight:700;color:var(--brand);font-variant-numeric:tabular-nums}
+h1:focus,h2:focus{outline:none}
 
 .banner{background:var(--sel);border-bottom:1px solid var(--line);padding:8px 16px;font-size:.88rem;text-align:center}
 </style>
@@ -376,6 +377,7 @@ window.CA_STATIC = true;
       return;
     }
     const isNew = S.mode === 'new';
+    const needCode = isNew && !!(S.cfg && S.cfg.requireCode);
     view(`<div class="card">
       <h1>职业锚测试</h1>
       <p class="muted">共 40 题，约 10 分钟。完成后立即获得你的职业锚报告，结果会保存，之后可凭「邮箱 + 查看密钥」再次查看。</p>
@@ -388,6 +390,7 @@ window.CA_STATIC = true;
         <label for="email">邮箱</label><input id="email" type="email" maxlength="120" required>
         <label for="key">查看密钥</label><input id="key" type="password" minlength="6" maxlength="32" required autocomplete="new-password">
         ${isNew ? '<label for="key2">再次输入查看密钥</label><input id="key2" type="password" minlength="6" maxlength="32" required autocomplete="new-password"><p class="muted">密钥 6–32 位，用于以后查看结果。系统不会发邮件，忘记后需联系管理员重置，请牢记。</p>' : '<p class="muted">忘记密钥？请联系管理员重置。</p>'}
+        ${needCode ? '<label for="code">兑换码</label><input id="code" type="text" maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="例如 AB3K-7MQ2" required><p class="muted">购买后获得的兑换码，每个码只能开始一次测试。</p>' : ''}
         <div class="err" id="err" role="alert">${esc(msg || '')}</div>
         <div class="row"><button type="submit">${isNew ? '开始测试' : '进入'}</button></div>
       </form></div>`);
@@ -400,6 +403,7 @@ window.CA_STATIC = true;
       try {
         const r = await api('POST', '/api/enter', { name: isNew ? $('#name').value : undefined, email: $('#email').value, key });
         setToken(r.token); S.name = r.name; S.attempts = r.attempts;
+        S.pendingCode = needCode ? $('#code').value : '';
         await afterLogin();
       } catch (er) { btn.disabled = false; $('#err').textContent = er.message; }
     });
@@ -408,7 +412,10 @@ window.CA_STATIC = true;
   async function afterLogin() {
     if (!S.cfg) S.cfg = await api('GET', '/api/config');
     const draft = S.attempts.find((a) => a.status === 'draft');
-    if (!S.attempts.length || (S.attempts.length === 1 && draft)) return startOrResume();
+    if (!S.attempts.length || (S.attempts.length === 1 && draft)) {
+      if (!draft && S.cfg.requireCode && !S.pendingCode) return renderRedeem();
+      return startOrResume(S.pendingCode);
+    }
     renderHome();
   }
 
@@ -419,13 +426,29 @@ window.CA_STATIC = true;
         <button class="ghost" data-open="${a.id}">${a.status === 'submitted' ? '查看结果' : '继续作答'}</button></li>`).join('')}</ul>
       <div class="row">${hasDraft ? '' : '<button id="again">重新测试</button>'}<button class="ghost" id="out">退出</button></div></div>`);
     app.querySelectorAll('[data-open]').forEach((b) => b.addEventListener('click', () => openAttempt(Number(b.dataset.open))));
-    const again = $('#again'); if (again) again.addEventListener('click', startOrResume);
+    const again = $('#again'); if (again) again.addEventListener('click', () => (S.cfg.requireCode ? renderRedeem() : startOrResume()));
     $('#out').addEventListener('click', logout);
   }
 
   async function logout() { try { await api('POST', '/api/logout'); } catch (e) { /* 忽略 */ } setToken(null); S.att = null; S.mode = 'back'; renderEnter(); }
 
-  async function startOrResume() { S.att = await api('POST', '/api/attempts'); S.page = firstUnanswered(); S.picks = []; renderQuiz(); }
+  async function startOrResume(code) {
+    try { S.att = await api('POST', '/api/attempts', code ? { code } : {}); }
+    catch (e) { S.pendingCode = ''; if (S.cfg && S.cfg.requireCode) return renderRedeem(e.message); throw e; }
+    S.pendingCode = ''; S.page = firstUnanswered(); S.picks = []; renderQuiz();
+  }
+
+  function renderRedeem(msg) {
+    view(`<div class="card"><h1>输入兑换码</h1>
+      <p class="muted">你好，${esc(S.name)}。开始一次新的测试需要一个兑换码，每个码只能用一次。已经开始的测试和历史结果不需要兑换码。</p>
+      <form id="f" autocomplete="off"><label for="code">兑换码</label>
+        <input id="code" type="text" maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="例如 AB3K-7MQ2" required>
+        <div class="err" id="err" role="alert">${esc(msg || '')}</div>
+        <div class="row"><button type="submit">开始测试</button>${S.attempts.length ? '<button type="button" class="ghost" id="back">返回我的记录</button>' : ''}<button type="button" class="ghost" id="out">退出</button></div></form></div>`);
+    $('#f').addEventListener('submit', async (e) => { e.preventDefault(); e.target.querySelector('button[type=submit]').disabled = true; await startOrResume($('#code').value); });
+    const back = $('#back'); if (back) back.addEventListener('click', renderHome);
+    $('#out').addEventListener('click', logout);
+  }
   async function openAttempt(id) {
     S.att = await api('GET', '/api/attempts/' + id);
     if (S.att.status === 'submitted') return renderResult(S.att);
@@ -695,6 +718,7 @@ window.CA_STATIC = true;
 
   // ---------- 启动 ----------
   async function render() {
+    try { S.cfg = S.cfg || await api('GET', '/api/config'); } catch (e) { /* 忽略，进入时会再试 */ }
     if (!S.token) return renderEnter();
     try {
       const me = await api('GET', '/api/me'); S.name = me.name; S.attempts = me.attempts;

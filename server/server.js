@@ -54,7 +54,7 @@ function makeLimiter() {
 }
 
 function createApp(opts = {}) {
-  const config = { ...baseConfig, ...(opts.config || {}) };
+  const config = { ...baseConfig, requireCode: process.env.REQUIRE_CODE === '1', ...(opts.config || {}) };
   const db = openDb(opts.dbPath || process.env.DB_PATH || path.join(__dirname, '..', 'data', 'career-anchor.db'));
   const adminPassword = opts.adminPassword !== undefined ? opts.adminPassword : process.env.ADMIN_PASSWORD;
   const trustProxy = opts.trustProxy ?? process.env.TRUST_PROXY === '1';
@@ -67,6 +67,14 @@ function createApp(opts = {}) {
     pInsert: db.prepare('INSERT INTO participants(name,email,email_norm,key_hash,created_at) VALUES(?,?,?,?,?)'),
     pFail: db.prepare('UPDATE participants SET failed_count=?, locked_until=? WHERE id=?'),
     pSetKey: db.prepare('UPDATE participants SET key_hash=?, failed_count=0, locked_until=0 WHERE id=?'),
+    cGet: db.prepare('SELECT * FROM codes WHERE code=?'),
+    cUseSingle: db.prepare('UPDATE codes SET used_at=?, participant_id=? WHERE id=? AND used_at IS NULL AND voided=0'),
+    cBindSingle: db.prepare('UPDATE codes SET attempt_id=? WHERE id=?'),
+    cSharedCount: db.prepare('SELECT COUNT(*) c FROM code_uses WHERE code_id=?'),
+    cSharedHas: db.prepare('SELECT 1 FROM code_uses WHERE code_id=? AND participant_id=?'),
+    cSharedInsert: db.prepare('INSERT INTO code_uses(code_id,participant_id,used_at) VALUES(?,?,?)'),
+    cSharedBind: db.prepare('UPDATE code_uses SET attempt_id=? WHERE code_id=? AND participant_id=?'),
+    cInsert: db.prepare('INSERT INTO codes(code,note,created_at,kind,expires_at,max_uses) VALUES(?,?,?,?,?,?)'),
     sInsert: db.prepare('INSERT INTO sessions(token_hash,participant_id,expires_at) VALUES(?,?,?)'),
     sGet: db.prepare('SELECT * FROM sessions WHERE token_hash=? AND expires_at>?'),
     sDel: db.prepare('DELETE FROM sessions WHERE token_hash=?'),
@@ -150,6 +158,16 @@ function createApp(opts = {}) {
     return view;
   }
 
+  // 兑换码：8 位，去掉易混字符（0/O/1/I），展示为 XXXX-XXXX，比较时忽略大小写、空格和连字符
+  const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const normCode = (c) => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const showCode = (c, kind) => (kind === 'single' && c.length === 8 ? c.slice(0, 4) + '-' + c.slice(4) : c);
+  function genCode(len) {
+    let c = '';
+    for (let i = 0; i < len; i++) c += CODE_CHARS[crypto.randomInt(CODE_CHARS.length)];
+    return c;
+  }
+
   function validateAnswers(order, answers) {
     if (!answers || typeof answers !== 'object' || Array.isArray(answers)) throw new HttpError(400, '答案格式错误');
     const out = {};
@@ -173,7 +191,7 @@ function createApp(opts = {}) {
     const method = req.method;
     const ip = clientIp(req);
 
-    if (method === 'GET' && p === '/api/config') return send(res, 200, { top3Bonus: !!config.top3Bonus, pageSize: config.pageSize, anchors, order: ANCHOR_ORDER });
+    if (method === 'GET' && p === '/api/config') return send(res, 200, { top3Bonus: !!config.top3Bonus, pageSize: config.pageSize, requireCode: !!config.requireCode, anchors, order: ANCHOR_ORDER });
 
     if (method === 'POST' && p === '/api/enter') {
       if (!limit('enter:' + ip, config.enterPerMin || 30, 60_000)) throw new HttpError(429, '请求过于频繁，请稍后再试');
@@ -228,12 +246,38 @@ function createApp(opts = {}) {
 
     if (method === 'POST' && p === '/api/attempts') {
       const a = auth(req);
+      const body = await readJson(req);
       let row = q.aDraft.get(a.participantId);
-      if (!row) {
+      if (!row) { // 已有未完成的测试时直接继续，不消耗兑换码
+        let code = null;
+        if (config.requireCode) {
+          if (!limit('redeem:' + ip, 30, 10 * 60_000)) throw new HttpError(429, '尝试过于频繁，请稍后再试');
+          code = normCode(body.code);
+          if (!code) throw new HttpError(400, '请输入兑换码');
+        }
         const seed = crypto.randomInt(1, 2 ** 31);
         const order = shuffleIds(questions.map((x) => x.id), seed);
-        const r = q.aInsert.run(a.participantId, seed, JSON.stringify(order), now(), String(req.headers['user-agent'] || '').slice(0, 200), ipHash(ip));
-        row = q.aGet.get(Number(r.lastInsertRowid), a.participantId);
+        db.exec('BEGIN IMMEDIATE');
+        try {
+          let codeRow = null;
+          if (code) {
+            codeRow = q.cGet.get(code);
+            if (!codeRow || codeRow.voided) throw new HttpError(400, '兑换码无效或已被使用');
+            if (codeRow.expires_at && now() > codeRow.expires_at) throw new HttpError(400, '兑换码已过期');
+            if (codeRow.kind === 'single') {
+              if (!q.cUseSingle.run(now(), a.participantId, codeRow.id).changes) throw new HttpError(400, '兑换码无效或已被使用');
+            } else {
+              if (q.cSharedHas.get(codeRow.id, a.participantId)) throw new HttpError(400, '你已经用这个兑换码测试过了');
+              if (codeRow.max_uses != null && q.cSharedCount.get(codeRow.id).c >= codeRow.max_uses) throw new HttpError(400, '这个兑换码的使用名额已满');
+              q.cSharedInsert.run(codeRow.id, a.participantId, now());
+            }
+          }
+          const r = q.aInsert.run(a.participantId, seed, JSON.stringify(order), now(), String(req.headers['user-agent'] || '').slice(0, 200), ipHash(ip));
+          const attemptId = Number(r.lastInsertRowid);
+          if (codeRow) codeRow.kind === 'single' ? q.cBindSingle.run(attemptId, codeRow.id) : q.cSharedBind.run(attemptId, codeRow.id, a.participantId);
+          db.exec('COMMIT');
+          row = q.aGet.get(attemptId, a.participantId);
+        } catch (e) { db.exec('ROLLBACK'); throw e; }
       }
       return send(res, 200, attemptView(row, q.pById.get(a.participantId)));
     }
@@ -330,6 +374,90 @@ function createApp(opts = {}) {
           retakers: [...doneBy.values()].filter((n) => n > 1).length,
           primary, avgScores: avg, days, durationBins: bins,
         });
+      }
+      if (p === '/api/admin/codes' && method === 'POST') {
+        const body = await readJson(req);
+        const kind = body.kind === 'shared' ? 'shared' : 'single';
+        const note = String(body.note || '').trim().slice(0, 60);
+        let expiresAt = null;
+        if (body.hours !== undefined && body.hours !== null && body.hours !== '') {
+          const h = Number(body.hours);
+          if (!(h > 0 && h <= 24 * 365)) throw new HttpError(400, '有效时长需大于 0 且不超过 8760 小时');
+          expiresAt = now() + Math.round(h * 3600_000);
+        }
+        if (kind === 'single') {
+          const count = Number(body.count);
+          if (!Number.isInteger(count) || count < 1 || count > 200) throw new HttpError(400, '数量需为 1–200 的整数');
+          const out = [];
+          while (out.length < count) {
+            const c = genCode(8);
+            try { const r = q.cInsert.run(c, note, now(), 'single', expiresAt, null); out.push({ id: Number(r.lastInsertRowid), code: showCode(c, 'single'), note, expiresAt }); } catch { /* 极小概率重复，重试 */ }
+          }
+          return send(res, 200, { codes: out });
+        }
+        let maxUses = null;
+        if (body.maxUses !== undefined && body.maxUses !== null && body.maxUses !== '') {
+          maxUses = Number(body.maxUses);
+          if (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 100000) throw new HttpError(400, '最多使用人数需为 1–100000 的整数');
+        }
+        let code = normCode(body.customCode);
+        if (body.customCode && String(body.customCode).trim() && (code.length < 4 || code.length > 20)) throw new HttpError(400, '自定义码需为 4–20 位字母或数字');
+        const custom = !!code;
+        for (let i = 0; i < 20; i++) {
+          if (!custom) code = genCode(6);
+          try {
+            const r = q.cInsert.run(code, note, now(), 'shared', expiresAt, maxUses);
+            return send(res, 200, { codes: [{ id: Number(r.lastInsertRowid), code, note, expiresAt, maxUses }] });
+          } catch { if (custom) throw new HttpError(409, '这个兑换码已经存在，请换一个'); }
+        }
+        throw new HttpError(500, '生成失败，请重试');
+      }
+      // 状态：active 当前可用 / used 已用完（一次性码已使用，或通用码名额已满）/ expired 已过期 / voided 已作废
+      const stNow = now();
+      const COND = {
+        voided: 'c.voided=1',
+        used: `c.voided=0 AND ((c.kind='single' AND c.used_at IS NOT NULL) OR (c.kind='shared' AND c.max_uses IS NOT NULL AND (SELECT COUNT(*) FROM code_uses u WHERE u.code_id=c.id)>=c.max_uses))`,
+        expired: `c.voided=0 AND c.expires_at IS NOT NULL AND c.expires_at<=${stNow} AND NOT (c.kind='single' AND c.used_at IS NOT NULL)`,
+      };
+      COND.active = `c.voided=0 AND (c.expires_at IS NULL OR c.expires_at>${stNow}) AND NOT (${COND.used})`;
+      if (p === '/api/admin/codes' && method === 'GET') {
+        const page = Math.max(1, Number(url.searchParams.get('page')) || 1);
+        const size = 50;
+        const st = url.searchParams.get('status');
+        const W = COND[st] ? 'WHERE ' + COND[st] : '';
+        const total = db.prepare(`SELECT COUNT(*) c FROM codes c ${W}`).get().c;
+        const rows = db.prepare(`SELECT c.id,c.code,c.note,c.kind,c.created_at,c.used_at,c.voided,c.expires_at,c.max_uses,p.name,
+            (SELECT COUNT(*) FROM code_uses u WHERE u.code_id=c.id) uses,
+            CASE WHEN ${COND.voided} THEN 'voided' WHEN ${COND.used} THEN 'used' WHEN ${COND.expired} THEN 'expired' ELSE 'active' END state
+          FROM codes c LEFT JOIN participants p ON p.id=c.participant_id ${W} ORDER BY c.id DESC LIMIT ? OFFSET ?`).all(size, (page - 1) * size);
+        const cnt = (k) => db.prepare(`SELECT COUNT(*) c FROM codes c WHERE ${COND[k]}`).get().c;
+        const summary = { total: db.prepare('SELECT COUNT(*) c FROM codes').get().c, active: cnt('active'), used: cnt('used'), expired: cnt('expired'), voided: cnt('voided') };
+        return send(res, 200, { total, page, size, summary, rows: rows.map((r) => ({ id: r.id, code: showCode(r.code, r.kind), kind: r.kind, note: r.note, state: r.state, createdAt: r.created_at, expiresAt: r.expires_at, maxUses: r.max_uses, uses: r.kind === 'shared' ? r.uses : (r.used_at ? 1 : 0), usedAt: r.used_at, usedBy: r.kind === 'single' ? r.name : null })) });
+      }
+      if (p === '/api/admin/codes/export.csv' && method === 'GET') {
+        const rows = db.prepare(`SELECT c.code,c.note,c.kind,c.created_at,c.used_at,c.expires_at,c.max_uses,p.name,(SELECT COUNT(*) FROM code_uses u WHERE u.code_id=c.id) uses,
+            CASE WHEN ${COND.voided} THEN 'voided' WHEN ${COND.used} THEN 'used' WHEN ${COND.expired} THEN 'expired' ELSE 'active' END state
+          FROM codes c LEFT JOIN participants p ON p.id=c.participant_id ORDER BY c.id`).all();
+        const iso = (t) => (t ? new Date(t).toISOString() : '');
+        const label = { active: '可用', used: '已用完', expired: '已过期', voided: '已作废' };
+        const lines = [['兑换码', '类型', '备注', '状态', '已使用人数', '人数上限', '使用者', '创建时间', '到期时间', '使用时间'].map(csvCell).join(',')];
+        for (const r of rows) lines.push([showCode(r.code, r.kind), r.kind === 'shared' ? '通用码' : '一次性码', r.note, label[r.state], r.kind === 'shared' ? r.uses : (r.used_at ? 1 : 0), r.max_uses ?? '', r.kind === 'single' ? r.name || '' : '', iso(r.created_at), iso(r.expires_at), iso(r.used_at)].map(csvCell).join(','));
+        return send(res, 200, '﻿' + lines.join('\r\n'), { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="redeem-codes.csv"' });
+      }
+      const cm = /^\/api\/admin\/codes\/(\d+)\/(void|extend)$/.exec(p);
+      if (cm && method === 'POST') {
+        const id = Number(cm[1]);
+        if (cm[2] === 'void') {
+          const r = db.prepare("UPDATE codes SET voided=1 WHERE id=? AND voided=0 AND (kind='shared' OR used_at IS NULL)").run(id);
+          if (!r.changes) throw new HttpError(409, '这个兑换码不能作废（已作废，或一次性码已被使用）');
+          return send(res, 200, { ok: true });
+        }
+        const body = await readJson(req);
+        const h = Number(body.hours);
+        if (!(h > 0 && h <= 24 * 365)) throw new HttpError(400, '有效时长需大于 0 且不超过 8760 小时');
+        const r = db.prepare('UPDATE codes SET expires_at=? WHERE id=? AND voided=0').run(now() + Math.round(h * 3600_000), id);
+        if (!r.changes) throw new HttpError(409, '已作废的兑换码不能修改有效期');
+        return send(res, 200, { ok: true, expiresAt: now() + Math.round(h * 3600_000) });
       }
       if (method === 'GET' && p === '/api/admin/attempts/export.csv') {
         const rows = db.prepare('SELECT a.id,p.name,p.email,a.status,a.primary_anchors,a.scores,a.started_at,a.submitted_at FROM attempts a JOIN participants p ON p.id=a.participant_id ORDER BY a.id').all();
