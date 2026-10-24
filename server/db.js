@@ -39,6 +39,17 @@ function openDb(file) {
     );
     CREATE INDEX IF NOT EXISTS idx_attempts_participant ON attempts(participant_id);
     CREATE INDEX IF NOT EXISTS idx_attempts_status ON attempts(status, submitted_at);
+    CREATE TABLE IF NOT EXISTS codes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT NOT NULL UNIQUE,
+      note TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      used_at INTEGER,
+      participant_id INTEGER REFERENCES participants(id) ON DELETE SET NULL,
+      attempt_id INTEGER REFERENCES attempts(id) ON DELETE SET NULL,
+      voided INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_codes_used ON codes(used_at, voided);
     CREATE TABLE IF NOT EXISTS sessions (
       token_hash TEXT PRIMARY KEY,
       participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE,

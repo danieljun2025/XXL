@@ -28,3 +28,14 @@ docker run -d --name ca --restart unless-stopped -p 3000:3000 \
   -v ca-data:/data -e ADMIN_PASSWORD=你的口令 career-anchor
 ```
 前面放 Caddy/Nginx 做 HTTPS。数据库在 `/data/career-anchor.db`，备份用 `sqlite3 ... ".backup ..."`。
+
+## 兑换码（卖测试服务时使用）
+完整版支持一次性兑换码：每个码只能开始一次新的测试；已经开始的测试和历史结果不需要码。
+
+1. 在 Render 服务页 → Environment 里添加环境变量 `REQUIRE_CODE` = `1`，保存后自动重启。（不设置时不要求兑换码，方便自己测试。）
+2. 登录后台 → 「兑换码管理」→ 生成（可填备注，如订单号），复制后发给买家，可导出 CSV。
+3. 买家在首次测试的表单里填写兑换码；输错或已被使用会提示"兑换码无效或已被使用"。
+4. 买家填错了兑换码不会消耗任何码；连续输错过多会被临时限速。
+5. 未使用的码可以在后台"作废"；已使用的码不能作废。
+
+静态备用版（`/career-anchor/`）没有兑换码，也不要拿它卖。
