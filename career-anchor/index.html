@@ -355,6 +355,9 @@ window.CA_STATIC = true;
     return data;
   }
   function setToken(t) { S.token = t; try { t ? sessionStorage.setItem('ca_token', t) : sessionStorage.removeItem('ca_token'); } catch (e) { /* 忽略 */ } }
+  // 隐私说明与服务说明放在完整版站点上；静态备用版用绝对地址
+  const LEGAL = window.CA_STATIC ? 'https://anchor.matchgamers.com' : '';
+  const legalNote = (verb) => `<p class="muted small" style="margin-top:14px">${verb}即表示你已阅读并同意<a href="${LEGAL}/privacy.html" target="_blank" rel="noopener">隐私说明</a>和<a href="${LEGAL}/terms.html" target="_blank" rel="noopener">服务说明与退款规则</a>。</p>`;
   const view = (html) => { app.innerHTML = html; window.scrollTo(0, 0); const h = app.querySelector('h1,h2'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } };
 
   // ---------- 入口 ----------
@@ -364,7 +367,7 @@ window.CA_STATIC = true;
         <p class="muted">共 40 题，约 10 分钟。完成后立即生成你的职业锚报告，报告上会显示你的名字，并可保存为图片。</p>
         <form id="f" autocomplete="off"><label for="name">你的名字</label><input id="name" type="text" maxlength="30" required>
         <div class="err" id="err" role="alert">${esc(msg || '')}</div>
-        <div class="row"><button type="submit">开始测试</button></div></form></div>`);
+        <div class="row"><button type="submit">开始测试</button></div>${legalNote('点击「开始测试」')}</form></div>`);
       $('#f').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = e.target.querySelector('button[type=submit]'); btn.disabled = true;
@@ -394,6 +397,7 @@ window.CA_STATIC = true;
         ${needCode ? (codeRequired ? '<label for="code">兑换码</label><input id="code" type="text" maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="例如 AB3K-7MQ2" required><p class="muted">购买后获得的兑换码，每个码只能开始一次测试。</p>' : '<label for="code">团队码（没有可不填）</label><input id="code" type="text" maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="负责人发给你的团队码"><p class="muted">如果是团队或班级组织的测试，请填写负责人给你的团队码。</p>') : ''}
         <div class="err" id="err" role="alert">${esc(msg || '')}</div>
         <div class="row"><button type="submit">${isNew ? '开始测试' : '进入'}</button></div>
+        ${isNew ? legalNote('点击「开始测试」') : ''}
       </form></div>`);
     app.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { S.mode = b.dataset.mode; renderEnter(); }));
     $('#f').addEventListener('submit', async (e) => {
@@ -452,7 +456,7 @@ window.CA_STATIC = true;
   function renderConsent(team, code) {
     view(`<div class="card"><h1>加入团队「${esc(team.name)}」</h1>
       <p>${team.shareNames ? '团队负责人可以看到<b>整个团队的汇总统计</b>，以及你的<b>姓名和主职业锚</b>。' : '团队负责人只能看到<b>整个团队的汇总统计</b>，看不到你的姓名、答案和个人结果。'}</p>
-      <p class="muted">你的完整报告只有你自己能用邮箱和查看密钥看到。点「同意并开始」即表示你知晓以上安排。</p>
+      <p class="muted">你的完整报告只有你自己能用邮箱和查看密钥看到。点「同意并开始」即表示你知晓以上安排；更多说明见<a href="${LEGAL}/privacy.html" target="_blank" rel="noopener">隐私说明</a>。</p>
       <div class="row"><button type="button" id="ok">同意并开始</button><button type="button" class="ghost" id="no">取消</button></div></div>`);
     $('#ok').addEventListener('click', () => { $('#ok').disabled = true; doStart(code); });
     $('#no').addEventListener('click', () => { S.pendingCode = ''; S.attempts.length ? renderHome() : renderRedeem(); });

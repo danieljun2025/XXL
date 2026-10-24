@@ -9,7 +9,7 @@
 | 顺序 | 事项 | Issue | 退出标准 |
 |---|---|---|---|
 | 0 | 合并「团队码 + 产品管理体系」（PR #11） | [#11](https://github.com/danieljun2025/XXL/pull/11) | CI 通过、发布清单走完、部署后冒烟通过 |
-| 1 | Render 快照与备份恢复演练 | [#14](https://github.com/danieljun2025/XXL/issues/14) | 快照开启，恢复演练一次并写入手册 |
+| 1 | 备份：确认自动快照 + 下载数据库备份 + 恢复演练 | [#14](https://github.com/danieljun2025/XXL/issues/14) | Disks 页面出现自动快照；后台可下载备份并演练恢复（已在测试里覆盖） |
 | 2 | 隐私说明页与删除流程 | [#12](https://github.com/danieljun2025/XXL/issues/12) | 页面上线，表单与同意页有链接 |
 | 3 | 服务说明与退款规则 | [#13](https://github.com/danieljun2025/XXL/issues/13) | 页面上线，文案与商品描述一致 |
 | 4 | 启用兑换码：清单与首批码 | [#15](https://github.com/danieljun2025/XXL/issues/15) | `REQUIRE_CODE=1`，完整验证通过，可一键回退 |

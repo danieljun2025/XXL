@@ -104,7 +104,7 @@ Dockerfile render.yaml DEPLOY.md README.md
   - 环境变量：`ADMIN_PASSWORD`（自己保管，不要写进仓库）、`REQUIRE_CODE`（见下）。
   - **启用兑换码**：先在后台生成好码 → Render → Environment 添加 `REQUIRE_CODE` = `1` → 保存重启。关闭就删掉或改 `0`。
   - **暂停省钱**：Settings 最底部 Suspend；磁盘仍有极小费用；暂停前先导出 CSV；暂停期间不要点 Blueprint 的 Manual sync。
-  - **备份**：数据库是 `/data/career-anchor.db`，建议在 Render 磁盘设置里开启快照；后台也可导出 CSV。
+  - **备份**：数据库是 `/data/career-anchor.db`。Render 磁盘快照是**自动**的（每 24 小时一次，保留 7 天，恢复会丢失快照之后的改动）；另外后台有「下载数据库备份」，建议每周下载一份存在自己的电脑或网盘。恢复步骤见 `docs/product/05-process.md` 运维手册。
 - **清除浏览器里的测试记录**（静态版/预览）：开发者工具 → Application → Local storage → 删除 `ca_preview_db_v1`。
 
 ## 7. 开发工作流（给下次继续用）
@@ -130,7 +130,7 @@ Dockerfile render.yaml DEPLOY.md README.md
 2. ~~团队码 + 分团队报表~~（已完成，见第 3 节）；团队版交付流程和定价待定。
 3. 写闲鱼上架文案（标题、描述、自动回复、FAQ）和主图。
 4. 页面上补一页**隐私说明**（收集什么、怎么用、如何删除）和**退款说明**。
-5. 开启 Render 磁盘快照；确认 GitHub Pages 的 Enforce HTTPS 已勾选。
+5. 在 Render 的 Disks 页面确认已出现自动快照；确认 GitHub Pages 的 Enforce HTTPS 已勾选；每周下载一次数据库备份。
 6. 解读版的预约/交付流程（人工 20 分钟解读的模板和记录方式）。
 7. 可选：品牌名/Logo、报告里加二维码或署名、PDF 导出、英文版。
 

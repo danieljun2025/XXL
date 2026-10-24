@@ -3,6 +3,8 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const os = require('node:os');
+const { DatabaseSync } = require('node:sqlite');
 const { promisify } = require('node:util');
 const { openDb } = require('./db');
 const { ANCHOR_ORDER, shuffleIds, score } = require('./scoring');
@@ -458,6 +460,39 @@ function createApp(opts = {}) {
         const total = db.prepare(`SELECT COUNT(*) c FROM attempts a JOIN participants p ON p.id=a.participant_id ${W}`).get(...args).c;
         const rows = db.prepare(`SELECT a.id,p.id pid,p.name,p.email,a.status,a.primary_anchors,a.scores,a.started_at,a.submitted_at,tm.name teamName FROM attempts a JOIN participants p ON p.id=a.participant_id LEFT JOIN teams tm ON tm.id=a.team_id ${W} ORDER BY a.id DESC LIMIT ? OFFSET ?`).all(...args, size, (page - 1) * size);
         return send(res, 200, { total, page, size, rows: rows.map((r) => ({ id: r.id, participantId: r.pid, name: r.name, email: r.email, status: r.status, primary: r.primary_anchors ? JSON.parse(r.primary_anchors) : null, scores: r.scores ? JSON.parse(r.scores) : null, startedAt: r.started_at, submittedAt: r.submitted_at, team: r.teamName })) });
+      }
+      // 数据库备份：服务端生成一致性副本（VACUUM INTO），去掉登录会话后下载；备份里密钥只有哈希
+      if (method === 'GET' && p === '/api/admin/backup') {
+        if (!limit('backup', 20, 3600_000)) throw new HttpError(429, '备份下载过于频繁，请稍后再试');
+        const tmp = path.join(os.tmpdir(), `ca-backup-${crypto.randomBytes(6).toString('hex')}.db`);
+        try {
+          db.exec(`VACUUM INTO '${tmp.replace(/'/g, "''")}'`);
+          const copy = new DatabaseSync(tmp);
+          copy.exec('DELETE FROM sessions');
+          copy.exec('VACUUM');
+          copy.close();
+          const buf = fs.readFileSync(tmp);
+          const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+          return send(res, 200, buf, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="career-anchor-${stamp}.db"` });
+        } finally { for (const f of [tmp, tmp + '-wal', tmp + '-shm']) fs.rmSync(f, { force: true }); }
+      }
+      // 清理长期无活动的数据：先预览，再执行
+      const staleSql = 'SELECT p.id FROM participants p WHERE COALESCE((SELECT MAX(COALESCE(a.submitted_at,a.started_at)) FROM attempts a WHERE a.participant_id=p.id), p.created_at) < ?';
+      if (p === '/api/admin/purge-preview' && method === 'GET') {
+        const months = Number(url.searchParams.get('months'));
+        if (!Number.isInteger(months) || months < 1 || months > 120) throw new HttpError(400, '月数需为 1–120 的整数');
+        const cutoff = now() - months * 30 * 86400_000;
+        return send(res, 200, { months, cutoff, count: db.prepare(staleSql).all(cutoff).length });
+      }
+      if (p === '/api/admin/purge' && method === 'POST') {
+        const body = await readJson(req);
+        const months = Number(body.months);
+        if (!Number.isInteger(months) || months < 1 || months > 120) throw new HttpError(400, '月数需为 1–120 的整数');
+        const ids = db.prepare(staleSql).all(now() - months * 30 * 86400_000).map((r) => r.id);
+        const del = db.prepare('DELETE FROM participants WHERE id=?');
+        db.exec('BEGIN IMMEDIATE');
+        try { for (const id of ids) del.run(id); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; }
+        return send(res, 200, { deleted: ids.length });
       }
       if (method === 'GET' && p === '/api/admin/stats') {
         const dist = Object.fromEntries(ANCHOR_ORDER.map((c) => [c, 0]));
