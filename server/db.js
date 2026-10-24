@@ -22,6 +22,15 @@ function openDb(file) {
       locked_until INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS teams (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      key_hash TEXT NOT NULL UNIQUE,
+      share_names INTEGER NOT NULL DEFAULT 0,
+      closed INTEGER NOT NULL DEFAULT 0
+    );
     CREATE TABLE IF NOT EXISTS attempts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
@@ -35,7 +44,8 @@ function openDb(file) {
       started_at INTEGER NOT NULL,
       submitted_at INTEGER,
       user_agent TEXT,
-      ip_hash TEXT
+      ip_hash TEXT,
+      team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL
     );
     CREATE INDEX IF NOT EXISTS idx_attempts_participant ON attempts(participant_id);
     CREATE INDEX IF NOT EXISTS idx_attempts_status ON attempts(status, submitted_at);
@@ -67,8 +77,15 @@ function openDb(file) {
     );
   `);
   // 兼容已存在的旧库：补齐后加的列
-  const cols = db.prepare('PRAGMA table_info(codes)').all().map((c) => c.name);
-  for (const [n, d] of [['kind', "TEXT NOT NULL DEFAULT 'single'"], ['expires_at', 'INTEGER'], ['max_uses', 'INTEGER']]) if (!cols.includes(n)) db.exec(`ALTER TABLE codes ADD COLUMN ${n} ${d}`);
+  const addCol = (table, name, def) => {
+    if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${def}`);
+  };
+  addCol('codes', 'kind', "TEXT NOT NULL DEFAULT 'single'");
+  addCol('codes', 'expires_at', 'INTEGER');
+  addCol('codes', 'max_uses', 'INTEGER');
+  addCol('codes', 'team_id', 'INTEGER REFERENCES teams(id) ON DELETE SET NULL');
+  addCol('attempts', 'team_id', 'INTEGER REFERENCES teams(id) ON DELETE SET NULL');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_attempts_team ON attempts(team_id)');
   let row = db.prepare("SELECT v FROM meta WHERE k='ip_salt'").get();
   if (!row) {
     db.prepare("INSERT OR IGNORE INTO meta(k,v) VALUES('ip_salt',?)").run(crypto.randomBytes(16).toString('hex'));

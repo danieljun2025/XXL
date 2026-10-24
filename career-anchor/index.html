@@ -377,7 +377,8 @@ window.CA_STATIC = true;
       return;
     }
     const isNew = S.mode === 'new';
-    const needCode = isNew && !!(S.cfg && S.cfg.requireCode);
+    const needCode = isNew && !!(S.cfg && S.cfg.showCodeField);
+    const codeRequired = !!(S.cfg && S.cfg.requireCode);
     view(`<div class="card">
       <h1>职业锚测试</h1>
       <p class="muted">共 40 题，约 10 分钟。完成后立即获得你的职业锚报告，结果会保存，之后可凭「邮箱 + 查看密钥」再次查看。</p>
@@ -390,7 +391,7 @@ window.CA_STATIC = true;
         <label for="email">邮箱</label><input id="email" type="email" maxlength="120" required>
         <label for="key">查看密钥</label><input id="key" type="password" minlength="6" maxlength="32" required autocomplete="new-password">
         ${isNew ? '<label for="key2">再次输入查看密钥</label><input id="key2" type="password" minlength="6" maxlength="32" required autocomplete="new-password"><p class="muted">密钥 6–32 位，用于以后查看结果。系统不会发邮件，忘记后需联系管理员重置，请牢记。</p>' : '<p class="muted">忘记密钥？请联系管理员重置。</p>'}
-        ${needCode ? '<label for="code">兑换码</label><input id="code" type="text" maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="例如 AB3K-7MQ2" required><p class="muted">购买后获得的兑换码，每个码只能开始一次测试。</p>' : ''}
+        ${needCode ? (codeRequired ? '<label for="code">兑换码</label><input id="code" type="text" maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="例如 AB3K-7MQ2" required><p class="muted">购买后获得的兑换码，每个码只能开始一次测试。</p>' : '<label for="code">团队码（没有可不填）</label><input id="code" type="text" maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="负责人发给你的团队码"><p class="muted">如果是团队或班级组织的测试，请填写负责人给你的团队码。</p>') : ''}
         <div class="err" id="err" role="alert">${esc(msg || '')}</div>
         <div class="row"><button type="submit">${isNew ? '开始测试' : '进入'}</button></div>
       </form></div>`);
@@ -414,7 +415,7 @@ window.CA_STATIC = true;
     const draft = S.attempts.find((a) => a.status === 'draft');
     if (!S.attempts.length || (S.attempts.length === 1 && draft)) {
       if (!draft && S.cfg.requireCode && !S.pendingCode) return renderRedeem();
-      return startOrResume(S.pendingCode);
+      return startOrResume(draft ? '' : S.pendingCode);
     }
     renderHome();
   }
@@ -426,29 +427,50 @@ window.CA_STATIC = true;
         <button class="ghost" data-open="${a.id}">${a.status === 'submitted' ? '查看结果' : '继续作答'}</button></li>`).join('')}</ul>
       <div class="row">${hasDraft ? '' : '<button id="again">重新测试</button>'}<button class="ghost" id="out">退出</button></div></div>`);
     app.querySelectorAll('[data-open]').forEach((b) => b.addEventListener('click', () => openAttempt(Number(b.dataset.open))));
-    const again = $('#again'); if (again) again.addEventListener('click', () => (S.cfg.requireCode ? renderRedeem() : startOrResume()));
+    const again = $('#again'); if (again) again.addEventListener('click', () => (S.cfg.showCodeField ? renderRedeem() : startOrResume()));
     $('#out').addEventListener('click', logout);
   }
 
   async function logout() { try { await api('POST', '/api/logout'); } catch (e) { /* 忽略 */ } setToken(null); S.att = null; S.mode = 'back'; renderEnter(); }
 
   async function startOrResume(code) {
+    if (code) { // 先检查兑换码；团队码要先让成员知情同意
+      try {
+        const c = await api('POST', '/api/codes/check', { code });
+        if (c.team) return renderConsent(c.team, code);
+      } catch (e) { S.pendingCode = ''; if (S.cfg && S.cfg.showCodeField) return renderRedeem(e.message); throw e; }
+    }
+    return doStart(code);
+  }
+
+  async function doStart(code) {
     try { S.att = await api('POST', '/api/attempts', code ? { code } : {}); }
-    catch (e) { S.pendingCode = ''; if (S.cfg && S.cfg.requireCode) return renderRedeem(e.message); throw e; }
+    catch (e) { S.pendingCode = ''; if (S.cfg && S.cfg.showCodeField) return renderRedeem(e.message); throw e; }
     S.pendingCode = ''; S.page = firstUnanswered(); S.picks = []; renderQuiz();
   }
 
+  function renderConsent(team, code) {
+    view(`<div class="card"><h1>加入团队「${esc(team.name)}」</h1>
+      <p>${team.shareNames ? '团队负责人可以看到<b>整个团队的汇总统计</b>，以及你的<b>姓名和主职业锚</b>。' : '团队负责人只能看到<b>整个团队的汇总统计</b>，看不到你的姓名、答案和个人结果。'}</p>
+      <p class="muted">你的完整报告只有你自己能用邮箱和查看密钥看到。点「同意并开始」即表示你知晓以上安排。</p>
+      <div class="row"><button type="button" id="ok">同意并开始</button><button type="button" class="ghost" id="no">取消</button></div></div>`);
+    $('#ok').addEventListener('click', () => { $('#ok').disabled = true; doStart(code); });
+    $('#no').addEventListener('click', () => { S.pendingCode = ''; S.attempts.length ? renderHome() : renderRedeem(); });
+  }
+
   function renderRedeem(msg) {
-    view(`<div class="card"><h1>输入兑换码</h1>
-      <p class="muted">你好，${esc(S.name)}。开始一次新的测试需要一个兑换码，每个码只能用一次。已经开始的测试和历史结果不需要兑换码。</p>
-      <form id="f" autocomplete="off"><label for="code">兑换码</label>
-        <input id="code" type="text" maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="例如 AB3K-7MQ2" required>
+    const optional = !(S.cfg && S.cfg.requireCode);
+    view(`<div class="card"><h1>${optional ? '团队码' : '输入兑换码'}</h1>
+      <p class="muted">你好，${esc(S.name)}。${optional ? '如果是团队或班级组织的测试，请填写负责人给你的团队码；没有的话可以直接开始。' : '开始一次新的测试需要一个兑换码，每个码只能用一次。已经开始的测试和历史结果不需要兑换码。'}</p>
+      <form id="f" autocomplete="off"><label for="code">${optional ? '团队码（可不填）' : '兑换码'}</label>
+        <input id="code" type="text" maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="例如 AB3K-7MQ2" ${optional ? '' : 'required'}>
         <div class="err" id="err" role="alert">${esc(msg || '')}</div>
         <div class="row"><button type="submit">开始测试</button>${S.attempts.length ? '<button type="button" class="ghost" id="back">返回我的记录</button>' : ''}<button type="button" class="ghost" id="out">退出</button></div></form></div>`);
     $('#f').addEventListener('submit', async (e) => { e.preventDefault(); e.target.querySelector('button[type=submit]').disabled = true; await startOrResume($('#code').value); });
     const back = $('#back'); if (back) back.addEventListener('click', renderHome);
     $('#out').addEventListener('click', logout);
   }
+
   async function openAttempt(id) {
     S.att = await api('GET', '/api/attempts/' + id);
     if (S.att.status === 'submitted') return renderResult(S.att);
@@ -571,7 +593,7 @@ window.CA_STATIC = true;
       const tiles = r.primary.map((c) => { const dl = lines(AN[c].definition, 24, CW - 56 - 76 - 170, false); return { c, dl, h: Math.max(112, 28 + 40 + dl.length * 32 + 24) }; });
       const heroH = 52 + 34 + 70 + 44 + tiles.reduce((a, t) => a + t.h + 16, 0) + 36;
       if (draw) { ctx.fillStyle = col.brand; ctx.fillRect(0, 0, W, heroH); }
-      txt(`${fmt(r.submittedAt)} · 报告编号 ${r.reportNo}`, P, 52, 24, 'rgba(255,255,255,.85)');
+      txt(`${r.team ? '团队：' + r.team + ' · ' : ''}${fmt(r.submittedAt)} · 报告编号 ${r.reportNo}`, P, 52, 24, 'rgba(255,255,255,.85)');
       txt(`${r.name} 的职业锚报告`, P, 52 + 36, 54, '#ffffff', true);
       txt(r.primary.length > 1 ? '你有两个并列突出的职业锚' : '你最突出的职业锚是', P, 52 + 34 + 70, 26, 'rgba(255,255,255,.9)');
       let y = 52 + 34 + 70 + 44;
@@ -695,7 +717,7 @@ window.CA_STATIC = true;
     const AN = S.cfg.anchors, order = S.cfg.order, MAX = S.cfg.top3Bonus ? 8.4 : 6;
     const sec = r.ranking.filter((c) => !r.primary.includes(c)).slice(0, 2);
     const box = (title, inner, cls = '') => `<div class="dbox ${cls}"><h3>${title}</h3>${inner}</div>`;
-    view(`<section class="rhero"><p class="meta">${esc(fmt(r.submittedAt))} · 报告编号 ${esc(r.reportNo)}</p>
+    view(`<section class="rhero"><p class="meta">${r.team ? '团队：' + esc(r.team) + ' · ' : ''}${esc(fmt(r.submittedAt))} · 报告编号 ${esc(r.reportNo)}</p>
       <h1>${esc(r.name)} 的职业锚报告</h1>
       <p class="lead">${r.primary.length > 1 ? '你有两个并列突出的职业锚' : '你最突出的职业锚是'}</p>
       ${r.primary.map((c) => `<div class="pa"><span class="pcode" aria-hidden="true">${esc(c)}</span><div class="pa-t"><b>${esc(AN[c].name)}</b><span>${esc(AN[c].definition)}</span></div><span class="pscore" title="得分">${r.scores[c].toFixed(1)}<small>/${MAX}</small></span></div>`).join('')}</section>

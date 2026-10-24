@@ -74,7 +74,7 @@ function createApp(opts = {}) {
     cSharedHas: db.prepare('SELECT 1 FROM code_uses WHERE code_id=? AND participant_id=?'),
     cSharedInsert: db.prepare('INSERT INTO code_uses(code_id,participant_id,used_at) VALUES(?,?,?)'),
     cSharedBind: db.prepare('UPDATE code_uses SET attempt_id=? WHERE code_id=? AND participant_id=?'),
-    cInsert: db.prepare('INSERT INTO codes(code,note,created_at,kind,expires_at,max_uses) VALUES(?,?,?,?,?,?)'),
+    cInsert: db.prepare('INSERT INTO codes(code,note,created_at,kind,expires_at,max_uses,team_id) VALUES(?,?,?,?,?,?,?)'),
     sInsert: db.prepare('INSERT INTO sessions(token_hash,participant_id,expires_at) VALUES(?,?,?)'),
     sGet: db.prepare('SELECT * FROM sessions WHERE token_hash=? AND expires_at>?'),
     sDel: db.prepare('DELETE FROM sessions WHERE token_hash=?'),
@@ -82,7 +82,10 @@ function createApp(opts = {}) {
     aList: db.prepare('SELECT id,status,started_at,submitted_at,primary_anchors FROM attempts WHERE participant_id=? ORDER BY id DESC'),
     aGet: db.prepare('SELECT * FROM attempts WHERE id=? AND participant_id=?'),
     aDraft: db.prepare("SELECT * FROM attempts WHERE participant_id=? AND status='draft' ORDER BY id DESC LIMIT 1"),
-    aInsert: db.prepare('INSERT INTO attempts(participant_id,seed,question_order,started_at,user_agent,ip_hash) VALUES(?,?,?,?,?,?)'),
+    aInsert: db.prepare('INSERT INTO attempts(participant_id,seed,question_order,started_at,user_agent,ip_hash,team_id) VALUES(?,?,?,?,?,?,?)'),
+    tById: db.prepare('SELECT * FROM teams WHERE id=?'),
+    tByKey: db.prepare('SELECT * FROM teams WHERE key_hash=?'),
+    tCount: db.prepare('SELECT COUNT(*) c FROM teams WHERE closed=0'),
     aSaveAnswers: db.prepare("UPDATE attempts SET answers=? WHERE id=? AND status='draft'"),
     aSubmit: db.prepare("UPDATE attempts SET status='submitted', answers=?, top3=?, scores=?, primary_anchors=?, submitted_at=? WHERE id=? AND status='draft'"),
   };
@@ -146,6 +149,8 @@ function createApp(opts = {}) {
   function attemptView(r, participant) {
     const order = JSON.parse(r.question_order);
     const view = { id: r.id, status: r.status, name: participant.name, reportNo: reportNo(r), config: { top3Bonus: !!config.top3Bonus, pageSize: config.pageSize } };
+    const tm = r.team_id ? q.tById.get(r.team_id) : null;
+    if (tm) view.team = tm.name;
     if (r.status === 'draft') {
       view.questions = order.map((id) => ({ id, text: qById.get(id).text }));
       view.answers = JSON.parse(r.answers);
@@ -166,6 +171,99 @@ function createApp(opts = {}) {
     let c = '';
     for (let i = 0; i < len; i++) c += CODE_CHARS[crypto.randomInt(CODE_CHARS.length)];
     return c;
+  }
+
+  const normKey = (k) => String(k || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const showKey = (k) => k.match(/.{1,4}/g).join('-');
+  const keyHash = (k) => sha256('team:' + normKey(k));
+
+  // 兑换码是否可用；可用返回 null，否则返回给用户看的原因
+  function codeProblem(codeRow, participantId) {
+    if (!codeRow || codeRow.voided) return '兑换码无效或已被使用';
+    if (codeRow.team_id) { const t = q.tById.get(codeRow.team_id); if (!t || t.closed) return '该团队已关闭，兑换码不可用'; }
+    if (codeRow.expires_at && now() > codeRow.expires_at) return '兑换码已过期';
+    if (codeRow.kind === 'single') return codeRow.used_at ? '兑换码无效或已被使用' : null;
+    if (q.cSharedHas.get(codeRow.id, participantId)) return '你已经用这个兑换码测试过了';
+    if (codeRow.max_uses != null && q.cSharedCount.get(codeRow.id).c >= codeRow.max_uses) return '这个兑换码的使用名额已满';
+    return null;
+  }
+
+  // 生成兑换码（一次性码批量 / 通用码一个）；teamId 不为空时归属某个团队
+  function createCodes(body, teamId = null) {
+    const kind = body.kind === 'shared' ? 'shared' : 'single';
+    const note = String(body.note || '').trim().slice(0, 60);
+    let expiresAt = null;
+    if (body.hours !== undefined && body.hours !== null && body.hours !== '') {
+      const h = Number(body.hours);
+      if (!(h > 0 && h <= 24 * 365)) throw new HttpError(400, '有效时长需大于 0 且不超过 8760 小时');
+      expiresAt = now() + Math.round(h * 3600_000);
+    }
+    if (kind === 'single') {
+      const count = Number(body.count);
+      if (!Number.isInteger(count) || count < 1 || count > 200) throw new HttpError(400, '数量需为 1–200 的整数');
+      const out = [];
+      while (out.length < count) {
+        const c = genCode(8);
+        try { const r = q.cInsert.run(c, note, now(), 'single', expiresAt, null, teamId); out.push({ id: Number(r.lastInsertRowid), code: showCode(c, 'single'), note, expiresAt }); } catch { /* 极小概率重复，重试 */ }
+      }
+      return out;
+    }
+    let maxUses = null;
+    if (body.maxUses !== undefined && body.maxUses !== null && body.maxUses !== '') {
+      maxUses = Number(body.maxUses);
+      if (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 100000) throw new HttpError(400, '最多使用人数需为 1–100000 的整数');
+    }
+    let code = normCode(body.customCode);
+    if (body.customCode && String(body.customCode).trim() && (code.length < 4 || code.length > 20)) throw new HttpError(400, '自定义码需为 4–20 位字母或数字');
+    const custom = !!code;
+    for (let i = 0; i < 20; i++) {
+      if (!custom) code = genCode(6);
+      try {
+        const r = q.cInsert.run(code, note, now(), 'shared', expiresAt, maxUses, teamId);
+        return [{ id: Number(r.lastInsertRowid), code, note, expiresAt, maxUses }];
+      } catch { if (custom) throw new HttpError(409, '这个兑换码已经存在，请换一个'); }
+    }
+    throw new HttpError(500, '生成失败，请重试');
+  }
+
+  // 统计报表（teamId 为空时统计全部）
+  function buildReport(teamId, tz) {
+    const rows = teamId
+      ? db.prepare('SELECT participant_id,status,scores,primary_anchors,started_at,submitted_at FROM attempts WHERE team_id=?').all(teamId)
+      : db.prepare('SELECT participant_id,status,scores,primary_anchors,started_at,submitted_at FROM attempts').all();
+    const done = rows.filter((r) => r.status === 'submitted');
+    const dayKey = (t) => new Date(t + tz * 60000).toISOString().slice(0, 10);
+    const primary = Object.fromEntries(ANCHOR_ORDER.map((c) => [c, 0]));
+    const sum = Object.fromEntries(ANCHOR_ORDER.map((c) => [c, 0]));
+    const perDay = {};
+    const mins = [];
+    const doneBy = new Map();
+    for (const r of done) {
+      for (const c of JSON.parse(r.primary_anchors)) primary[c]++;
+      const sc = JSON.parse(r.scores);
+      for (const c of ANCHOR_ORDER) sum[c] += sc[c];
+      const k = dayKey(r.submitted_at);
+      perDay[k] = (perDay[k] || 0) + 1;
+      mins.push((r.submitted_at - r.started_at) / 60000);
+      doneBy.set(r.participant_id, (doneBy.get(r.participant_id) || 0) + 1);
+    }
+    mins.sort((x, y) => x - y);
+    const days = [];
+    for (let i = 29; i >= 0; i--) { const k = dayKey(now() - i * 86400000); days.push({ date: k, count: perDay[k] || 0 }); }
+    const edges = [5, 10, 15, 20, 30];
+    const bins = ['<5 分', '5–10 分', '10–15 分', '15–20 分', '20–30 分', '30 分以上'].map((label) => ({ label, count: 0 }));
+    for (const m of mins) bins[edges.filter((e) => m >= e).length].count++;
+    const drafts = rows.length - done.length;
+    const avg = Object.fromEntries(ANCHOR_ORDER.map((c) => [c, done.length ? Math.round((sum[c] / done.length) * 10) / 10 : null]));
+    return {
+      participants: teamId ? new Set(rows.map((r) => r.participant_id)).size : db.prepare('SELECT COUNT(*) c FROM participants').get().c,
+      submitted: done.length, drafts,
+      completionRate: rows.length ? done.length / rows.length : null,
+      last7: days.slice(-7).reduce((a, d) => a + d.count, 0),
+      medianMinutes: mins.length ? Math.round(mins[Math.floor(mins.length / 2)] * 10) / 10 : null,
+      retakers: [...doneBy.values()].filter((n) => n > 1).length,
+      primary, avgScores: avg, days, durationBins: bins,
+    };
   }
 
   function validateAnswers(order, answers) {
@@ -191,7 +289,7 @@ function createApp(opts = {}) {
     const method = req.method;
     const ip = clientIp(req);
 
-    if (method === 'GET' && p === '/api/config') return send(res, 200, { top3Bonus: !!config.top3Bonus, pageSize: config.pageSize, requireCode: !!config.requireCode, anchors, order: ANCHOR_ORDER });
+    if (method === 'GET' && p === '/api/config') return send(res, 200, { top3Bonus: !!config.top3Bonus, pageSize: config.pageSize, requireCode: !!config.requireCode, showCodeField: !!config.requireCode || q.tCount.get().c > 0, anchors, order: ANCHOR_ORDER });
 
     if (method === 'POST' && p === '/api/enter') {
       if (!limit('enter:' + ip, config.enterPerMin || 30, 60_000)) throw new HttpError(429, '请求过于频繁，请稍后再试');
@@ -244,15 +342,27 @@ function createApp(opts = {}) {
       return send(res, 200, { name: part.name, attempts: q.aList.all(part.id).map(attemptSummary) });
     }
 
+    if (method === 'POST' && p === '/api/codes/check') {
+      const a = auth(req);
+      const body = await readJson(req);
+      if (!limit('redeem:' + ip, 30, 10 * 60_000)) throw new HttpError(429, '尝试过于频繁，请稍后再试');
+      const code = normCode(body.code);
+      if (!code) throw new HttpError(400, '请输入兑换码');
+      const row = q.cGet.get(code);
+      const problem = codeProblem(row, a.participantId);
+      if (problem) throw new HttpError(400, problem);
+      const t = row.team_id ? q.tById.get(row.team_id) : null;
+      return send(res, 200, { kind: row.kind, team: t ? { name: t.name, shareNames: !!t.share_names } : null });
+    }
+
     if (method === 'POST' && p === '/api/attempts') {
       const a = auth(req);
       const body = await readJson(req);
       let row = q.aDraft.get(a.participantId);
       if (!row) { // 已有未完成的测试时直接继续，不消耗兑换码
-        let code = null;
-        if (config.requireCode) {
+        const code = normCode(body.code);
+        if (config.requireCode || code) {
           if (!limit('redeem:' + ip, 30, 10 * 60_000)) throw new HttpError(429, '尝试过于频繁，请稍后再试');
-          code = normCode(body.code);
           if (!code) throw new HttpError(400, '请输入兑换码');
         }
         const seed = crypto.randomInt(1, 2 ** 31);
@@ -262,17 +372,13 @@ function createApp(opts = {}) {
           let codeRow = null;
           if (code) {
             codeRow = q.cGet.get(code);
-            if (!codeRow || codeRow.voided) throw new HttpError(400, '兑换码无效或已被使用');
-            if (codeRow.expires_at && now() > codeRow.expires_at) throw new HttpError(400, '兑换码已过期');
+            const problem = codeProblem(codeRow, a.participantId);
+            if (problem) throw new HttpError(400, problem);
             if (codeRow.kind === 'single') {
               if (!q.cUseSingle.run(now(), a.participantId, codeRow.id).changes) throw new HttpError(400, '兑换码无效或已被使用');
-            } else {
-              if (q.cSharedHas.get(codeRow.id, a.participantId)) throw new HttpError(400, '你已经用这个兑换码测试过了');
-              if (codeRow.max_uses != null && q.cSharedCount.get(codeRow.id).c >= codeRow.max_uses) throw new HttpError(400, '这个兑换码的使用名额已满');
-              q.cSharedInsert.run(codeRow.id, a.participantId, now());
-            }
+            } else q.cSharedInsert.run(codeRow.id, a.participantId, now());
           }
-          const r = q.aInsert.run(a.participantId, seed, JSON.stringify(order), now(), String(req.headers['user-agent'] || '').slice(0, 200), ipHash(ip));
+          const r = q.aInsert.run(a.participantId, seed, JSON.stringify(order), now(), String(req.headers['user-agent'] || '').slice(0, 200), ipHash(ip), codeRow ? codeRow.team_id : null);
           const attemptId = Number(r.lastInsertRowid);
           if (codeRow) codeRow.kind === 'single' ? q.cBindSingle.run(attemptId, codeRow.id) : q.cSharedBind.run(attemptId, codeRow.id, a.participantId);
           db.exec('COMMIT');
@@ -280,6 +386,29 @@ function createApp(opts = {}) {
         } catch (e) { db.exec('ROLLBACK'); throw e; }
       }
       return send(res, 200, attemptView(row, q.pById.get(a.participantId)));
+    }
+
+    // 团队负责人查看团队汇总（凭团队报告码，不需要管理员口令）
+    if (method === 'POST' && p === '/api/team/report') {
+      if (!limit('teamkey:' + ip, 60, 10 * 60_000)) throw new HttpError(429, '请求过于频繁，请稍后再试');
+      const body = await readJson(req);
+      const key = normKey(body.key);
+      const team = key.length === 12 ? q.tByKey.get(keyHash(key)) : null;
+      if (!team) {
+        if (!limit('teamfail:' + ip, 10, 15 * 60_000)) throw new HttpError(429, '尝试次数过多，请稍后再试');
+        throw new HttpError(401, '团队报告码不正确');
+      }
+      const tz = Math.max(-840, Math.min(840, Number(body.tz) || 0));
+      const rep = buildReport(team.id, tz);
+      const minGroup = Number(config.teamMinGroup) || 0;
+      const insufficient = rep.submitted < minGroup;
+      const out = { team: { name: team.name, shareNames: !!team.share_names, closed: !!team.closed }, minGroup, insufficient };
+      if (insufficient) Object.assign(out, { participants: rep.participants, submitted: rep.submitted, drafts: rep.drafts });
+      else out.report = rep;
+      if (team.share_names) {
+        out.members = db.prepare("SELECT p.name,a.primary_anchors,a.submitted_at FROM attempts a JOIN participants p ON p.id=a.participant_id WHERE a.team_id=? AND a.status='submitted' ORDER BY a.submitted_at DESC").all(team.id).map((r) => ({ name: r.name, primary: JSON.parse(r.primary_anchors), submittedAt: r.submitted_at }));
+      }
+      return send(res, 200, out);
     }
 
     const m = /^\/api\/attempts\/(\d+)(?:\/(answers|submit))?$/.exec(p);
@@ -327,8 +456,8 @@ function createApp(opts = {}) {
         if (status === 'draft' || status === 'submitted') { where.push('a.status=?'); args.push(status); }
         const W = where.length ? 'WHERE ' + where.join(' AND ') : '';
         const total = db.prepare(`SELECT COUNT(*) c FROM attempts a JOIN participants p ON p.id=a.participant_id ${W}`).get(...args).c;
-        const rows = db.prepare(`SELECT a.id,p.id pid,p.name,p.email,a.status,a.primary_anchors,a.scores,a.started_at,a.submitted_at FROM attempts a JOIN participants p ON p.id=a.participant_id ${W} ORDER BY a.id DESC LIMIT ? OFFSET ?`).all(...args, size, (page - 1) * size);
-        return send(res, 200, { total, page, size, rows: rows.map((r) => ({ id: r.id, participantId: r.pid, name: r.name, email: r.email, status: r.status, primary: r.primary_anchors ? JSON.parse(r.primary_anchors) : null, scores: r.scores ? JSON.parse(r.scores) : null, startedAt: r.started_at, submittedAt: r.submitted_at })) });
+        const rows = db.prepare(`SELECT a.id,p.id pid,p.name,p.email,a.status,a.primary_anchors,a.scores,a.started_at,a.submitted_at,tm.name teamName FROM attempts a JOIN participants p ON p.id=a.participant_id LEFT JOIN teams tm ON tm.id=a.team_id ${W} ORDER BY a.id DESC LIMIT ? OFFSET ?`).all(...args, size, (page - 1) * size);
+        return send(res, 200, { total, page, size, rows: rows.map((r) => ({ id: r.id, participantId: r.pid, name: r.name, email: r.email, status: r.status, primary: r.primary_anchors ? JSON.parse(r.primary_anchors) : null, scores: r.scores ? JSON.parse(r.scores) : null, startedAt: r.started_at, submittedAt: r.submitted_at, team: r.teamName })) });
       }
       if (method === 'GET' && p === '/api/admin/stats') {
         const dist = Object.fromEntries(ANCHOR_ORDER.map((c) => [c, 0]));
@@ -340,77 +469,59 @@ function createApp(opts = {}) {
       }
       if (method === 'GET' && p === '/api/admin/report') {
         const tz = Math.max(-840, Math.min(840, Number(url.searchParams.get('tz')) || 0)); // 客户端时区偏移（分钟，东区为正）
-        const rows = db.prepare('SELECT participant_id,status,scores,primary_anchors,started_at,submitted_at FROM attempts').all();
-        const done = rows.filter((r) => r.status === 'submitted');
-        const dayKey = (t) => new Date(t + tz * 60000).toISOString().slice(0, 10);
-        const primary = Object.fromEntries(ANCHOR_ORDER.map((c) => [c, 0]));
-        const sum = Object.fromEntries(ANCHOR_ORDER.map((c) => [c, 0]));
-        const perDay = {};
-        const mins = [];
-        const doneBy = new Map();
-        for (const r of done) {
-          for (const c of JSON.parse(r.primary_anchors)) primary[c]++;
-          const sc = JSON.parse(r.scores);
-          for (const c of ANCHOR_ORDER) sum[c] += sc[c];
-          const k = dayKey(r.submitted_at);
-          perDay[k] = (perDay[k] || 0) + 1;
-          mins.push((r.submitted_at - r.started_at) / 60000);
-          doneBy.set(r.participant_id, (doneBy.get(r.participant_id) || 0) + 1);
-        }
-        mins.sort((x, y) => x - y);
-        const days = [];
-        for (let i = 29; i >= 0; i--) { const k = dayKey(now() - i * 86400000); days.push({ date: k, count: perDay[k] || 0 }); }
-        const edges = [5, 10, 15, 20, 30];
-        const bins = ['<5 分', '5–10 分', '10–15 分', '15–20 分', '20–30 分', '30 分以上'].map((label) => ({ label, count: 0 }));
-        for (const m of mins) bins[edges.filter((e) => m >= e).length].count++;
-        const drafts = rows.length - done.length;
-        const avg = Object.fromEntries(ANCHOR_ORDER.map((c) => [c, done.length ? Math.round((sum[c] / done.length) * 10) / 10 : null]));
-        return send(res, 200, {
-          participants: db.prepare('SELECT COUNT(*) c FROM participants').get().c,
-          submitted: done.length, drafts,
-          completionRate: rows.length ? done.length / rows.length : null,
-          last7: days.slice(-7).reduce((a, d) => a + d.count, 0),
-          medianMinutes: mins.length ? Math.round(mins[Math.floor(mins.length / 2)] * 10) / 10 : null,
-          retakers: [...doneBy.values()].filter((n) => n > 1).length,
-          primary, avgScores: avg, days, durationBins: bins,
-        });
+        const tid = Number(url.searchParams.get('team')) || null;
+        const team = tid ? q.tById.get(tid) : null;
+        if (tid && !team) throw new HttpError(404, '团队不存在');
+        return send(res, 200, { ...buildReport(tid, tz), team: team ? { id: team.id, name: team.name } : null });
       }
       if (p === '/api/admin/codes' && method === 'POST') {
         const body = await readJson(req);
-        const kind = body.kind === 'shared' ? 'shared' : 'single';
-        const note = String(body.note || '').trim().slice(0, 60);
-        let expiresAt = null;
-        if (body.hours !== undefined && body.hours !== null && body.hours !== '') {
-          const h = Number(body.hours);
-          if (!(h > 0 && h <= 24 * 365)) throw new HttpError(400, '有效时长需大于 0 且不超过 8760 小时');
-          expiresAt = now() + Math.round(h * 3600_000);
+        let teamId = null;
+        if (body.teamId !== undefined && body.teamId !== null && body.teamId !== '') {
+          teamId = Number(body.teamId);
+          if (!q.tById.get(teamId)) throw new HttpError(400, '团队不存在');
         }
-        if (kind === 'single') {
-          const count = Number(body.count);
-          if (!Number.isInteger(count) || count < 1 || count > 200) throw new HttpError(400, '数量需为 1–200 的整数');
-          const out = [];
-          while (out.length < count) {
-            const c = genCode(8);
-            try { const r = q.cInsert.run(c, note, now(), 'single', expiresAt, null); out.push({ id: Number(r.lastInsertRowid), code: showCode(c, 'single'), note, expiresAt }); } catch { /* 极小概率重复，重试 */ }
-          }
-          return send(res, 200, { codes: out });
+        return send(res, 200, { codes: createCodes(body, teamId) });
+      }
+      if (p === '/api/admin/teams' && method === 'POST') {
+        const body = await readJson(req);
+        const name = String(body.name || '').trim();
+        if (!name || name.length > 60) throw new HttpError(400, '团队名称需为 1–60 个字符');
+        const note = String(body.note || '').trim().slice(0, 200);
+        const key = genCode(12);
+        db.exec('BEGIN IMMEDIATE');
+        try {
+          const r = db.prepare('INSERT INTO teams(name,note,created_at,key_hash,share_names) VALUES(?,?,?,?,?)').run(name, note, now(), keyHash(key), body.shareNames ? 1 : 0);
+          const id = Number(r.lastInsertRowid);
+          const code = body.code ? createCodes({ ...body.code, kind: 'shared', note: body.code.note || name }, id)[0] : null;
+          db.exec('COMMIT');
+          return send(res, 200, { team: { id, name, note, shareNames: !!body.shareNames }, reportKey: showKey(key), code });
+        } catch (e) { db.exec('ROLLBACK'); throw e; }
+      }
+      if (p === '/api/admin/teams' && method === 'GET') {
+        const rows = db.prepare(`SELECT t.*,
+            (SELECT COUNT(DISTINCT participant_id) FROM attempts a WHERE a.team_id=t.id) members,
+            (SELECT COUNT(*) FROM attempts a WHERE a.team_id=t.id AND a.status='submitted') submitted,
+            (SELECT COUNT(*) FROM attempts a WHERE a.team_id=t.id AND a.status='draft') drafts
+          FROM teams t ORDER BY t.id DESC`).all();
+        const codesOf = db.prepare('SELECT c.id,c.code,c.kind,c.expires_at,c.max_uses,c.voided,(SELECT COUNT(*) FROM code_uses u WHERE u.code_id=c.id) uses FROM codes c WHERE c.team_id=? ORDER BY c.id DESC LIMIT 20');
+        return send(res, 200, { teams: rows.map((t) => ({ id: t.id, name: t.name, note: t.note, createdAt: t.created_at, shareNames: !!t.share_names, closed: !!t.closed, members: t.members, submitted: t.submitted, drafts: t.drafts, codes: codesOf.all(t.id).map((c) => ({ id: c.id, code: showCode(c.code, c.kind), kind: c.kind, expiresAt: c.expires_at, maxUses: c.max_uses, voided: !!c.voided, uses: c.kind === 'shared' ? c.uses : 0 })) })) });
+      }
+      const tm = /^\/api\/admin\/teams\/(\d+)\/(update|regen-key)$/.exec(p);
+      if (tm && method === 'POST') {
+        const id = Number(tm[1]);
+        const team = q.tById.get(id);
+        if (!team) throw new HttpError(404, '团队不存在');
+        if (tm[2] === 'regen-key') {
+          const key = genCode(12);
+          db.prepare('UPDATE teams SET key_hash=? WHERE id=?').run(keyHash(key), id);
+          return send(res, 200, { reportKey: showKey(key) });
         }
-        let maxUses = null;
-        if (body.maxUses !== undefined && body.maxUses !== null && body.maxUses !== '') {
-          maxUses = Number(body.maxUses);
-          if (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 100000) throw new HttpError(400, '最多使用人数需为 1–100000 的整数');
-        }
-        let code = normCode(body.customCode);
-        if (body.customCode && String(body.customCode).trim() && (code.length < 4 || code.length > 20)) throw new HttpError(400, '自定义码需为 4–20 位字母或数字');
-        const custom = !!code;
-        for (let i = 0; i < 20; i++) {
-          if (!custom) code = genCode(6);
-          try {
-            const r = q.cInsert.run(code, note, now(), 'shared', expiresAt, maxUses);
-            return send(res, 200, { codes: [{ id: Number(r.lastInsertRowid), code, note, expiresAt, maxUses }] });
-          } catch { if (custom) throw new HttpError(409, '这个兑换码已经存在，请换一个'); }
-        }
-        throw new HttpError(500, '生成失败，请重试');
+        const body = await readJson(req);
+        const name = body.name === undefined ? team.name : String(body.name).trim();
+        if (!name || name.length > 60) throw new HttpError(400, '团队名称需为 1–60 个字符');
+        db.prepare('UPDATE teams SET name=?, note=?, share_names=?, closed=? WHERE id=?').run(name, body.note === undefined ? team.note : String(body.note).trim().slice(0, 200), body.shareNames === undefined ? team.share_names : body.shareNames ? 1 : 0, body.closed === undefined ? team.closed : body.closed ? 1 : 0, id);
+        return send(res, 200, { ok: true });
       }
       // 状态：active 当前可用 / used 已用完（一次性码已使用，或通用码名额已满）/ expired 已过期 / voided 已作废
       const stNow = now();
@@ -426,22 +537,22 @@ function createApp(opts = {}) {
         const st = url.searchParams.get('status');
         const W = COND[st] ? 'WHERE ' + COND[st] : '';
         const total = db.prepare(`SELECT COUNT(*) c FROM codes c ${W}`).get().c;
-        const rows = db.prepare(`SELECT c.id,c.code,c.note,c.kind,c.created_at,c.used_at,c.voided,c.expires_at,c.max_uses,p.name,
+        const rows = db.prepare(`SELECT c.id,c.code,c.note,c.kind,c.created_at,c.used_at,c.voided,c.expires_at,c.max_uses,p.name,tm.name teamName,
             (SELECT COUNT(*) FROM code_uses u WHERE u.code_id=c.id) uses,
             CASE WHEN ${COND.voided} THEN 'voided' WHEN ${COND.used} THEN 'used' WHEN ${COND.expired} THEN 'expired' ELSE 'active' END state
-          FROM codes c LEFT JOIN participants p ON p.id=c.participant_id ${W} ORDER BY c.id DESC LIMIT ? OFFSET ?`).all(size, (page - 1) * size);
+          FROM codes c LEFT JOIN participants p ON p.id=c.participant_id LEFT JOIN teams tm ON tm.id=c.team_id ${W} ORDER BY c.id DESC LIMIT ? OFFSET ?`).all(size, (page - 1) * size);
         const cnt = (k) => db.prepare(`SELECT COUNT(*) c FROM codes c WHERE ${COND[k]}`).get().c;
         const summary = { total: db.prepare('SELECT COUNT(*) c FROM codes').get().c, active: cnt('active'), used: cnt('used'), expired: cnt('expired'), voided: cnt('voided') };
-        return send(res, 200, { total, page, size, summary, rows: rows.map((r) => ({ id: r.id, code: showCode(r.code, r.kind), kind: r.kind, note: r.note, state: r.state, createdAt: r.created_at, expiresAt: r.expires_at, maxUses: r.max_uses, uses: r.kind === 'shared' ? r.uses : (r.used_at ? 1 : 0), usedAt: r.used_at, usedBy: r.kind === 'single' ? r.name : null })) });
+        return send(res, 200, { total, page, size, summary, rows: rows.map((r) => ({ id: r.id, code: showCode(r.code, r.kind), kind: r.kind, note: r.note, state: r.state, createdAt: r.created_at, expiresAt: r.expires_at, maxUses: r.max_uses, uses: r.kind === 'shared' ? r.uses : (r.used_at ? 1 : 0), usedAt: r.used_at, usedBy: r.kind === 'single' ? r.name : null, team: r.teamName })) });
       }
       if (p === '/api/admin/codes/export.csv' && method === 'GET') {
-        const rows = db.prepare(`SELECT c.code,c.note,c.kind,c.created_at,c.used_at,c.expires_at,c.max_uses,p.name,(SELECT COUNT(*) FROM code_uses u WHERE u.code_id=c.id) uses,
+        const rows = db.prepare(`SELECT c.code,c.note,c.kind,c.created_at,c.used_at,c.expires_at,c.max_uses,p.name,tm.name teamName,(SELECT COUNT(*) FROM code_uses u WHERE u.code_id=c.id) uses,
             CASE WHEN ${COND.voided} THEN 'voided' WHEN ${COND.used} THEN 'used' WHEN ${COND.expired} THEN 'expired' ELSE 'active' END state
-          FROM codes c LEFT JOIN participants p ON p.id=c.participant_id ORDER BY c.id`).all();
+          FROM codes c LEFT JOIN participants p ON p.id=c.participant_id LEFT JOIN teams tm ON tm.id=c.team_id ORDER BY c.id`).all();
         const iso = (t) => (t ? new Date(t).toISOString() : '');
         const label = { active: '可用', used: '已用完', expired: '已过期', voided: '已作废' };
-        const lines = [['兑换码', '类型', '备注', '状态', '已使用人数', '人数上限', '使用者', '创建时间', '到期时间', '使用时间'].map(csvCell).join(',')];
-        for (const r of rows) lines.push([showCode(r.code, r.kind), r.kind === 'shared' ? '通用码' : '一次性码', r.note, label[r.state], r.kind === 'shared' ? r.uses : (r.used_at ? 1 : 0), r.max_uses ?? '', r.kind === 'single' ? r.name || '' : '', iso(r.created_at), iso(r.expires_at), iso(r.used_at)].map(csvCell).join(','));
+        const lines = [['兑换码', '类型', '团队', '备注', '状态', '已使用人数', '人数上限', '使用者', '创建时间', '到期时间', '使用时间'].map(csvCell).join(',')];
+        for (const r of rows) lines.push([showCode(r.code, r.kind), r.kind === 'shared' ? '通用码' : '一次性码', r.teamName || '', r.note, label[r.state], r.kind === 'shared' ? r.uses : (r.used_at ? 1 : 0), r.max_uses ?? '', r.kind === 'single' ? r.name || '' : '', iso(r.created_at), iso(r.expires_at), iso(r.used_at)].map(csvCell).join(','));
         return send(res, 200, '﻿' + lines.join('\r\n'), { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="redeem-codes.csv"' });
       }
       const cm = /^\/api\/admin\/codes\/(\d+)\/(void|extend)$/.exec(p);
@@ -460,13 +571,13 @@ function createApp(opts = {}) {
         return send(res, 200, { ok: true, expiresAt: now() + Math.round(h * 3600_000) });
       }
       if (method === 'GET' && p === '/api/admin/attempts/export.csv') {
-        const rows = db.prepare('SELECT a.id,p.name,p.email,a.status,a.primary_anchors,a.scores,a.started_at,a.submitted_at FROM attempts a JOIN participants p ON p.id=a.participant_id ORDER BY a.id').all();
+        const rows = db.prepare('SELECT a.id,p.name,p.email,a.status,a.primary_anchors,a.scores,a.started_at,a.submitted_at,tm.name teamName FROM attempts a JOIN participants p ON p.id=a.participant_id LEFT JOIN teams tm ON tm.id=a.team_id ORDER BY a.id').all();
         const iso = (t) => (t ? new Date(t).toISOString() : '');
-        const lines = [['报告编号', '姓名', '邮箱', '状态', '主职业锚', ...ANCHOR_ORDER.map((c) => anchors[c].name), '开始时间', '提交时间'].map(csvCell).join(',')];
+        const lines = [['报告编号', '姓名', '邮箱', '团队', '状态', '主职业锚', ...ANCHOR_ORDER.map((c) => anchors[c].name), '开始时间', '提交时间'].map(csvCell).join(',')];
         for (const r of rows) {
           const sc = r.scores ? JSON.parse(r.scores) : {};
           const prim = r.primary_anchors ? JSON.parse(r.primary_anchors).map((c) => anchors[c].name).join('/') : '';
-          lines.push([reportNo(r), r.name, r.email, r.status === 'submitted' ? '已提交' : '进行中', prim, ...ANCHOR_ORDER.map((c) => sc[c] ?? ''), iso(r.started_at), iso(r.submitted_at)].map(csvCell).join(','));
+          lines.push([reportNo(r), r.name, r.email, r.teamName || '', r.status === 'submitted' ? '已提交' : '进行中', prim, ...ANCHOR_ORDER.map((c) => sc[c] ?? ''), iso(r.started_at), iso(r.submitted_at)].map(csvCell).join(','));
         }
         return send(res, 200, '﻿' + lines.join('\r\n'), { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="career-anchor.csv"' });
       }
