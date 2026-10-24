@@ -168,20 +168,22 @@
   }
 
   // ---------- 结果 ----------
-  function radar(scores, order) {
-    const C = 160, R = 105, n = order.length, MAX = S.cfg.top3Bonus ? 8 : 6;
+  function radar(scores, order, primary) {
+    const C = 170, R = 108, n = order.length, MAX = S.cfg.top3Bonus ? 8.4 : 6;
     const pt = (i, r) => { const a = -Math.PI / 2 + (2 * Math.PI * i) / n; return [C + r * Math.cos(a), C + r * Math.sin(a)]; };
     const rings = [1 / 3, 2 / 3, 1].map((v) => `<polygon class="grid" points="${order.map((_, i) => pt(i, R * v).join(',')).join(' ')}"/>`).join('');
+    const ticks = [1 / 3, 2 / 3, 1].map((v) => `<text class="tick" x="${C + 4}" y="${C - R * v - 2}">${(MAX * v).toFixed(1).replace('.0', '')}</text>`).join('');
     const axes = order.map((_, i) => `<line class="grid" x1="${C}" y1="${C}" x2="${pt(i, R)[0]}" y2="${pt(i, R)[1]}"/>`).join('');
     const shape = `<polygon class="shape" points="${order.map((c, i) => pt(i, (R * Math.min(scores[c], MAX)) / MAX).join(',')).join(' ')}"/>`;
-    const labels = order.map((c, i) => { const [x, y] = pt(i, R + 22); return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle">${esc(S.cfg.anchors[c].name.replace('型', ''))}</text>`; }).join('');
-    return `<svg class="radar" viewBox="0 0 320 320" role="img" aria-label="八个职业锚得分雷达图">${rings}${axes}${shape}${labels}</svg>`;
+    const dots = order.map((c, i) => { const [x, y] = pt(i, (R * Math.min(scores[c], MAX)) / MAX); return primary.includes(c) ? `<circle class="pdot" cx="${x}" cy="${y}" r="6"/>` : `<circle class="odot" cx="${x}" cy="${y}" r="3.5"/>`; }).join('');
+    const labels = order.map((c, i) => { const [x, y] = pt(i, R + 28); const p = primary.includes(c); return `<text class="rl${p ? ' main' : ''}" x="${x}" y="${y - 6}" text-anchor="middle">${esc(S.cfg.anchors[c].name.replace('型', ''))}</text><text class="rs${p ? ' main' : ''}" x="${x}" y="${y + 9}" text-anchor="middle">${scores[c].toFixed(1)}</text>`; }).join('');
+    return `<svg class="radar" viewBox="0 0 340 340" role="img" aria-label="八个职业锚得分雷达图">${rings}${axes}${ticks}${shape}${dots}${labels}</svg>`;
   }
   const list = (arr) => `<ul class="tag-list">${arr.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
 
   // ---------- 保存为图片（Canvas 自绘，无需外部库） ----------
   function drawReport(r) {
-    const AN = S.cfg.anchors, order = S.cfg.order, MAX = S.cfg.top3Bonus ? 8 : 6;
+    const AN = S.cfg.anchors, order = S.cfg.order, MAX = S.cfg.top3Bonus ? 8.4 : 6;
     const W = 1080, P = 64, CW = W - P * 2;
     const FONT = '-apple-system,"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif';
     const col = { bg: '#ffffff', text: '#1f2933', muted: '#667085', brand: '#2f6fed', line: '#e4e7ec', sel: '#e8f0fe' };
@@ -271,20 +273,23 @@
   }
 
   function renderResult(r) {
-    const AN = S.cfg.anchors, order = S.cfg.order, MAX = S.cfg.top3Bonus ? 8 : 6;
+    const AN = S.cfg.anchors, order = S.cfg.order, MAX = S.cfg.top3Bonus ? 8.4 : 6;
     const sec = r.ranking.filter((c) => !r.primary.includes(c)).slice(0, 2);
-    view(`<div class="card hero"><p class="muted">${esc(r.name)} · ${fmt(r.submittedAt)} · 报告编号 ${esc(r.reportNo)}</p>
+    const box = (title, inner, cls = '') => `<div class="dbox ${cls}"><h3>${title}</h3>${inner}</div>`;
+    view(`<section class="rhero"><p class="meta">${esc(fmt(r.submittedAt))} · 报告编号 ${esc(r.reportNo)}</p>
       <h1>${esc(r.name)} 的职业锚报告</h1>
-      <p><b>主职业锚：${r.primary.map((c) => esc(AN[c].name)).join('、')}</b></p>
-      ${r.primary.map((c) => `<p><span class="badge">${esc(c)}</span>${esc(AN[c].definition)}</p>`).join('')}</div>
-      ${r.primary.map((c) => `<div class="card"><h2>${esc(AN[c].name)}（${esc(AN[c].en)}）</h2>
-        <h3>核心动机</h3><p>${esc(AN[c].motivation)}</p><h3>典型优势</h3>${list(AN[c].strengths)}<h3>潜在盲区</h3>${list(AN[c].blindspots)}
-        <h3>适合的岗位与环境</h3>${list(AN[c].fit)}<h3>不太适合的环境</h3><p>${esc(AN[c].avoid.join('；'))}</p><h3>发展建议</h3>${list(AN[c].advice)}</div>`).join('')}
-      <div class="card"><h2>八个维度得分</h2>${radar(r.scores, order)}
-        <table><thead><tr><th>职业锚</th><th>得分</th><th></th></tr></thead><tbody>${r.ranking.map((c) => `<tr><td>${esc(AN[c].name)}</td><td>${r.scores[c].toFixed(1)}</td><td><div class="score-bar"><i style="width:${Math.min(r.scores[c], MAX) / MAX * 100}%"></i></div></td></tr>`).join('')}</tbody></table>
-        <p class="muted">分数越高表示该动机对你越重要（题目均分 1–6；你选出的 3 句话所属维度各加 0.8 分，因此最高可达 8.4）。</p></div>
-      <div class="card"><h2>次要职业锚</h2>${sec.map((c) => `<p><b>${esc(AN[c].name)}</b>：${esc(AN[c].definition)}</p>`).join('')}</div>
-      <div class="card muted">本测评基于 Schein 职业锚理论，仅作为自我认知参考，不构成录用、诊断或其他决策依据。</div>
+      <p class="lead">${r.primary.length > 1 ? '你有两个并列突出的职业锚' : '你最突出的职业锚是'}</p>
+      ${r.primary.map((c) => `<div class="pa"><span class="pcode" aria-hidden="true">${esc(c)}</span><div class="pa-t"><b>${esc(AN[c].name)}</b><span>${esc(AN[c].definition)}</span></div><span class="pscore" title="得分">${r.scores[c].toFixed(1)}<small>/${MAX}</small></span></div>`).join('')}</section>
+      <section class="card"><h2>你的职业锚画像</h2><p class="muted">雷达图越向外，说明该动机对你越重要；亮色标记的是你的主职业锚。</p>
+        <div class="profile">${radar(r.scores, order, r.primary)}
+          <ol class="rank" aria-label="八个维度得分排名">${r.ranking.map((c, i) => `<li class="${r.primary.includes(c) ? 'main' : ''}"><span class="rn">${i + 1}</span><span class="rname">${esc(AN[c].name)}</span><span class="rbar"><i style="width:${Math.min(r.scores[c], MAX) / MAX * 100}%"></i></span><span class="rval">${r.scores[c].toFixed(1)}</span></li>`).join('')}</ol></div>
+        <p class="muted small">分数 = 该维度 5 题均分${S.cfg.top3Bonus ? '，你最认同的 3 句话所属维度各加 0.8 分' : ''}。</p></section>
+      ${r.primary.map((c) => `<section class="card"><h2>${esc(AN[c].name)} <span class="en">${esc(AN[c].en)}</span></h2>
+        <p class="motive"><b>核心动机</b>${esc(AN[c].motivation)}</p>
+        <div class="dgrid">${box('典型优势', list(AN[c].strengths), 'good')}${box('潜在盲区', list(AN[c].blindspots), 'warn')}${box('适合的岗位与环境', list(AN[c].fit))}${box('发展建议', list(AN[c].advice))}</div>
+        <p class="avoid"><b>不太适合：</b>${esc(AN[c].avoid.join('；'))}</p></section>`).join('')}
+      <section class="card"><h2>次要职业锚</h2><div class="sgrid">${sec.map((c) => `<div class="sbox"><div class="sh"><b>${esc(AN[c].name)}</b><span>${r.scores[c].toFixed(1)}</span></div><p>${esc(AN[c].definition)}</p></div>`).join('')}</div></section>
+      <p class="muted small card">本测评基于 Schein 职业锚理论，仅作为自我认知参考，不构成录用、诊断或其他决策依据。</p>
       <div class="row noprint"><button id="save">保存为图片</button><button class="ghost" id="print">打印 / 保存为 PDF</button><button class="ghost" id="home">我的记录</button><button class="ghost" id="out">退出</button></div>`);
     $('#print').addEventListener('click', () => window.print());
     $('#save').addEventListener('click', () => saveImage(r));
