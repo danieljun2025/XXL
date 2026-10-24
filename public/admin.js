@@ -22,36 +22,13 @@
   async function load() {
     try {
       cfg = cfg || await (await fetch('/api/config')).json();
-      const tz = -new Date().getTimezoneOffset();
-      const [st, ls] = await Promise.all([api('GET', '/api/admin/report?tz=' + tz), api('GET', `/api/admin/attempts?page=${page}&q=${encodeURIComponent(q)}&status=${status}`)]);
-      draw(st, ls);
+      const ls = await api('GET', `/api/admin/attempts?page=${page}&q=${encodeURIComponent(q)}&status=${status}`);
+      draw(ls);
     } catch (e) { login(e.message); }
   }
-  const pct = (x) => (x == null ? '—' : Math.round(x * 100) + '%');
-  function hbars(items, max, fmtVal) {
-    return `<div class="hb">${items.map((it) => `<div class="hb-row" title="${esc(it.tip)}"><span class="hb-l">${esc(it.label)}</span><span class="hb-t"><i style="width:${max ? (it.value / max) * 100 : 0}%"></i></span><span class="hb-v">${esc(fmtVal(it))}</span></div>`).join('')}</div>`;
-  }
-  function report(st, A) {
-    const order = cfg.order;
-    const dist = order.map((c) => ({ label: A[c].name, value: st.primary[c], tip: `${A[c].name}：${st.primary[c]} 人次` })).sort((a, b) => b.value - a.value);
-    const total = dist.reduce((a, d) => a + d.value, 0);
-    const avg = order.map((c) => ({ label: A[c].name, value: st.avgScores[c] || 0, tip: `${A[c].name} 平均 ${st.avgScores[c] ?? '—'}` })).sort((a, b) => b.value - a.value);
-    const dmax = Math.max(1, ...st.days.map((d) => d.count));
-    const first = st.days[0].date.slice(5), mid = st.days[15].date.slice(5), last = st.days[29].date.slice(5);
-    return `<div class="kpis">
-        <div><b>${st.participants}</b>测试者</div><div><b>${st.submitted}</b>已完成</div><div><b>${st.drafts}</b>进行中</div>
-        <div><b>${pct(st.completionRate)}</b>完成率</div><div><b>${st.last7}</b>近 7 天完成</div><div><b>${st.medianMinutes == null ? '—' : st.medianMinutes < 1 ? '<1 分' : st.medianMinutes + ' 分'}</b>中位用时</div><div><b>${st.retakers}</b>重测人数</div></div>
-      <h2>主职业锚分布</h2><p class="muted">共 ${total} 人次（并列的主职业锚各计一次）</p>
-      ${st.submitted ? hbars(dist, Math.max(1, ...dist.map((d) => d.value)), (it) => `${it.value}（${total ? Math.round((it.value / total) * 100) : 0}%）`) : '<p class="muted">还没有人完成测试。</p>'}
-      <h2>各维度平均得分</h2><p class="muted">已完成者的平均分，范围 1–8.4（含加分）</p>
-      ${st.submitted ? hbars(avg, 8.4, (it) => it.value.toFixed(1)) : '<p class="muted">暂无数据。</p>'}
-      <h2>近 30 天每日完成数</h2>
-      <div class="cols" role="img" aria-label="近 30 天每日完成人数柱状图，最高 ${dmax} 人">${st.days.map((d) => `<span class="col" title="${esc(d.date)}：${d.count} 人"><i style="height:${(d.count / dmax) * 100}%"></i></span>`).join('')}</div>
-      <div class="cols-x"><span>${first}</span><span>${mid}</span><span>${last}</span><span class="muted">最高 ${dmax} 人/天</span></div>`;
-  }
-  function draw(st, ls) {
+  function draw(ls) {
     const A = cfg.anchors, pages = Math.max(1, Math.ceil(ls.total / ls.size));
-    app.innerHTML = `<div class="card"><h1>管理后台</h1>${report(st, A)}</div>
+    app.innerHTML = `<div class="card"><h1>管理后台</h1><p class="muted">共 ${ls.total} 条记录。</p><div class="row"><a class="btnlink" href="/report.html">查看统计报表 →</a></div></div>
       <div class="card"><form id="s" class="row" style="margin:0"><input id="q" type="text" placeholder="搜索姓名或邮箱" value="${esc(q)}" style="max-width:260px">
         <select id="st" style="padding:10px;border-radius:10px"><option value="">全部状态</option><option value="submitted" ${status === 'submitted' ? 'selected' : ''}>已提交</option><option value="draft" ${status === 'draft' ? 'selected' : ''}>进行中</option></select>
         <button>搜索</button><button type="button" class="ghost" id="csv">导出 CSV</button><button type="button" class="ghost" id="out">退出</button></form>
