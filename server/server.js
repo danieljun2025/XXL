@@ -76,6 +76,7 @@ function createApp(opts = {}) {
     cSharedHas: db.prepare('SELECT 1 FROM code_uses WHERE code_id=? AND participant_id=?'),
     cSharedInsert: db.prepare('INSERT INTO code_uses(code_id,participant_id,used_at) VALUES(?,?,?)'),
     cSharedBind: db.prepare('UPDATE code_uses SET attempt_id=? WHERE code_id=? AND participant_id=?'),
+    cRename: db.prepare('UPDATE codes SET code=? WHERE id=?'),
     cInsert: db.prepare('INSERT INTO codes(code,note,created_at,kind,expires_at,max_uses,team_id) VALUES(?,?,?,?,?,?,?)'),
     sInsert: db.prepare('INSERT INTO sessions(token_hash,participant_id,expires_at) VALUES(?,?,?)'),
     sGet: db.prepare('SELECT * FROM sessions WHERE token_hash=? AND expires_at>?'),
@@ -218,6 +219,14 @@ function createApp(opts = {}) {
     let code = normCode(body.customCode);
     if (body.customCode && String(body.customCode).trim() && (code.length < 4 || code.length > 20)) throw new HttpError(400, '自定义码需为 4–20 位字母或数字');
     const custom = !!code;
+    // 自定义码与已作废、已过期的旧码重名：把旧码归档（改名为「原码#编号」，保留它的使用记录），让这个文字可以重新使用
+    if (custom) {
+      const old = q.cGet.get(code);
+      if (old) {
+        if (!(old.voided || (old.expires_at && now() > old.expires_at))) throw new HttpError(409, '这个兑换码正在使用中。请先作废它，或换一个');
+        q.cRename.run(`${old.code}#${old.id}`, old.id);
+      }
+    }
     for (let i = 0; i < 20; i++) {
       if (!custom) code = genCode(6);
       try {
@@ -347,7 +356,7 @@ function createApp(opts = {}) {
     if (method === 'POST' && p === '/api/codes/check') {
       const a = auth(req);
       const body = await readJson(req);
-      if (!limit('redeem:' + ip, 30, 10 * 60_000)) throw new HttpError(429, '尝试过于频繁，请稍后再试');
+      if (!limit('redeem:' + ip, config.redeemLimit || 30, 10 * 60_000)) throw new HttpError(429, '尝试过于频繁，请稍后再试');
       const code = normCode(body.code);
       if (!code) throw new HttpError(400, '请输入兑换码');
       const row = q.cGet.get(code);
@@ -364,7 +373,7 @@ function createApp(opts = {}) {
       if (!row) { // 已有未完成的测试时直接继续，不消耗兑换码
         const code = normCode(body.code);
         if (config.requireCode || code) {
-          if (!limit('redeem:' + ip, 30, 10 * 60_000)) throw new HttpError(429, '尝试过于频繁，请稍后再试');
+          if (!limit('redeem:' + ip, config.redeemLimit || 30, 10 * 60_000)) throw new HttpError(429, '尝试过于频繁，请稍后再试');
           if (!code) throw new HttpError(400, '请输入兑换码');
         }
         const seed = crypto.randomInt(1, 2 ** 31);
@@ -460,6 +469,13 @@ function createApp(opts = {}) {
         const total = db.prepare(`SELECT COUNT(*) c FROM attempts a JOIN participants p ON p.id=a.participant_id ${W}`).get(...args).c;
         const rows = db.prepare(`SELECT a.id,p.id pid,p.name,p.email,a.status,a.primary_anchors,a.scores,a.started_at,a.submitted_at,tm.name teamName FROM attempts a JOIN participants p ON p.id=a.participant_id LEFT JOIN teams tm ON tm.id=a.team_id ${W} ORDER BY a.id DESC LIMIT ? OFFSET ?`).all(...args, size, (page - 1) * size);
         return send(res, 200, { total, page, size, rows: rows.map((r) => ({ id: r.id, participantId: r.pid, name: r.name, email: r.email, status: r.status, primary: r.primary_anchors ? JSON.parse(r.primary_anchors) : null, scores: r.scores ? JSON.parse(r.scores) : null, startedAt: r.started_at, submittedAt: r.submitted_at, team: r.teamName })) });
+      }
+      // 注册了但还没有答题记录的用户在记录列表里看不到，这里按姓名/邮箱列出所有用户
+      if (p === '/api/admin/participants' && method === 'GET') {
+        const kw = (url.searchParams.get('q') || '').trim().toLowerCase();
+        const like = '%' + kw.replace(/[\\%_]/g, '\\$&') + '%';
+        const rows = db.prepare(`SELECT p.id,p.name,p.email,p.created_at,(SELECT COUNT(*) FROM attempts a WHERE a.participant_id=p.id) attempts FROM participants p ${kw ? "WHERE lower(p.name) LIKE ? ESCAPE '\\' OR p.email_norm LIKE ? ESCAPE '\\'" : ''} ORDER BY p.id DESC LIMIT 100`).all(...(kw ? [like, like] : []));
+        return send(res, 200, { rows: rows.map((r) => ({ id: r.id, name: r.name, email: r.email, attempts: r.attempts, createdAt: r.created_at })) });
       }
       // 数据库备份：服务端生成一致性副本（VACUUM INTO），去掉登录会话后下载；备份里密钥只有哈希
       if (method === 'GET' && p === '/api/admin/backup') {
@@ -590,13 +606,31 @@ function createApp(opts = {}) {
         for (const r of rows) lines.push([showCode(r.code, r.kind), r.kind === 'shared' ? '通用码' : '一次性码', r.teamName || '', r.note, label[r.state], r.kind === 'shared' ? r.uses : (r.used_at ? 1 : 0), r.max_uses ?? '', r.kind === 'single' ? r.name || '' : '', iso(r.created_at), iso(r.expires_at), iso(r.used_at)].map(csvCell).join(','));
         return send(res, 200, '﻿' + lines.join('\r\n'), { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="redeem-codes.csv"' });
       }
-      const cm = /^\/api\/admin\/codes\/(\d+)\/(void|extend)$/.exec(p);
+      const cm = /^\/api\/admin\/codes\/(\d+)\/(void|extend|restore|limit)$/.exec(p);
       if (cm && method === 'POST') {
         const id = Number(cm[1]);
         if (cm[2] === 'void') {
           const r = db.prepare("UPDATE codes SET voided=1 WHERE id=? AND voided=0 AND (kind='shared' OR used_at IS NULL)").run(id);
           if (!r.changes) throw new HttpError(409, '这个兑换码不能作废（已作废，或一次性码已被使用）');
           return send(res, 200, { ok: true });
+        }
+        if (cm[2] === 'restore') {
+          const r = db.prepare("UPDATE codes SET voided=0 WHERE id=? AND voided=1 AND instr(code,'#')=0").run(id);
+          if (!r.changes) throw new HttpError(409, '只有已作废的兑换码可以恢复（已归档的旧码不能恢复，请重新生成）');
+          return send(res, 200, { ok: true });
+        }
+        if (cm[2] === 'limit') {
+          const body = await readJson(req);
+          const row = db.prepare('SELECT kind FROM codes WHERE id=?').get(id);
+          if (!row) throw new HttpError(404, '兑换码不存在');
+          if (row.kind !== 'shared') throw new HttpError(400, '只有通用码可以设置人数上限');
+          let maxUses = null;
+          if (body.maxUses !== undefined && body.maxUses !== null && body.maxUses !== '') {
+            maxUses = Number(body.maxUses);
+            if (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 100000) throw new HttpError(400, '最多使用人数需为 1–100000 的整数');
+          }
+          db.prepare('UPDATE codes SET max_uses=? WHERE id=?').run(maxUses, id);
+          return send(res, 200, { ok: true, maxUses });
         }
         const body = await readJson(req);
         const h = Number(body.hours);

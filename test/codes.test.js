@@ -5,7 +5,7 @@ const { createApp } = require('../server/server');
 
 let server, base;
 test.before(async () => {
-  server = createApp({ dbPath: ':memory:', adminPassword: 'admin-pass', config: { requireCode: true, enterPerMin: 1000 } });
+  server = createApp({ dbPath: ':memory:', adminPassword: 'admin-pass', config: { requireCode: true, enterPerMin: 100000, redeemLimit: 100000 } });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -166,9 +166,94 @@ test('一次性码也可以设置有效期', async () => {
   assert.match(r.body.error, /已过期/);
 });
 
+test('通用码：创建后可以修改最多使用人数（调高、调低、改为不限）', async () => {
+  const c = (await admin('POST', '/api/admin/codes', { kind: 'shared', maxUses: 1 })).body.codes[0];
+  assert.equal((await call('POST', '/api/attempts', { code: c.code }, await login(80))).status, 200);
+  const full = await call('POST', '/api/attempts', { code: c.code }, await login(81));
+  assert.match(full.body.error, /名额已满/);
+  assert.equal((await admin('GET', '/api/admin/codes?status=used')).body.rows.some((r) => r.id === c.id), true);
+  // 调高：恢复可用
+  assert.equal((await admin('POST', `/api/admin/codes/${c.id}/limit`, { maxUses: 3 })).status, 200);
+  assert.equal((await call('POST', '/api/attempts', { code: c.code }, await login(81))).status, 200);
+  const row = () => admin('GET', '/api/admin/codes').then((r) => r.body.rows.find((x) => x.id === c.id));
+  assert.equal((await row()).maxUses, 3);
+  assert.equal((await row()).uses, 2);
+  // 调到比已用人数还低：不再发放，已使用的人不受影响
+  assert.equal((await admin('POST', `/api/admin/codes/${c.id}/limit`, { maxUses: 1 })).status, 200);
+  assert.match((await call('POST', '/api/attempts', { code: c.code }, await login(82))).body.error, /名额已满/);
+  assert.equal((await row()).state, 'used');
+  // 改为不限
+  assert.equal((await admin('POST', `/api/admin/codes/${c.id}/limit`, { maxUses: '' })).status, 200);
+  assert.equal((await row()).maxUses, null);
+  assert.equal((await call('POST', '/api/attempts', { code: c.code }, await login(82))).status, 200);
+  // 校验
+  assert.equal((await admin('POST', `/api/admin/codes/${c.id}/limit`, { maxUses: 0 })).status, 400);
+  assert.equal((await admin('POST', `/api/admin/codes/${c.id}/limit`, { maxUses: 1.5 })).status, 400);
+  assert.equal((await admin('POST', '/api/admin/codes/99999/limit', { maxUses: 5 })).status, 404);
+  assert.equal((await call('POST', `/api/admin/codes/${c.id}/limit`, { maxUses: 5 })).status, 401);
+  const single = (await admin('POST', '/api/admin/codes', { kind: 'single', count: 1 })).body.codes[0];
+  assert.equal((await admin('POST', `/api/admin/codes/${single.id}/limit`, { maxUses: 5 })).status, 400);
+});
+
+test('作废后可以「恢复」，原有使用记录保留', async () => {
+  const c = (await admin('POST', '/api/admin/codes', { kind: 'shared' })).body.codes[0];
+  assert.equal((await call('POST', '/api/attempts', { code: c.code }, await login(90))).status, 200);
+  assert.equal((await admin('POST', `/api/admin/codes/${c.id}/restore`)).status, 409); // 还没作废
+  assert.equal((await admin('POST', `/api/admin/codes/${c.id}/void`)).status, 200);
+  assert.equal((await call('POST', '/api/attempts', { code: c.code }, await login(91))).status, 400);
+  assert.equal((await admin('POST', `/api/admin/codes/${c.id}/restore`)).status, 200);
+  assert.equal((await call('POST', '/api/attempts', { code: c.code }, await login(91))).status, 200);
+  const row = (await admin('GET', '/api/admin/codes')).body.rows.find((x) => x.id === c.id);
+  assert.equal(row.uses, 2);
+  assert.equal(row.state, 'active');
+});
+
+test('作废或过期后，可以用同一个文字重新生成新码（旧码归档，计数重新开始）', async () => {
+  const old = (await admin('POST', '/api/admin/codes', { kind: 'shared', customCode: 'reuse2026', maxUses: 1 })).body.codes[0];
+  assert.equal(old.code, 'REUSE2026');
+  const first = await login(100);
+  assert.equal((await call('POST', '/api/attempts', { code: 'REUSE2026' }, first)).status, 200);
+  // 正在使用中：不能重名
+  const dup = await admin('POST', '/api/admin/codes', { kind: 'shared', customCode: 'REUSE2026' });
+  assert.equal(dup.status, 409);
+  assert.match(dup.body.error, /先作废/);
+  // 作废后可以重新生成
+  assert.equal((await admin('POST', `/api/admin/codes/${old.id}/void`)).status, 200);
+  const fresh = await admin('POST', '/api/admin/codes', { kind: 'shared', customCode: 'REUSE2026', maxUses: 2, note: '第二批' });
+  assert.equal(fresh.status, 200);
+  assert.equal(fresh.body.codes[0].code, 'REUSE2026');
+  assert.notEqual(fresh.body.codes[0].id, old.id);
+  // 旧码被归档，保留记录
+  const rows = (await admin('GET', '/api/admin/codes')).body.rows;
+  const archived = rows.find((r) => r.id === old.id);
+  assert.equal(archived.code, `REUSE2026#${old.id}`);
+  assert.equal(archived.state, 'voided');
+  assert.equal(archived.uses, 1);
+  // 新码计数重新开始：用过旧码的人可以再用一次新码；新码人数上限独立
+  assert.equal((await call('POST', '/api/attempts', { code: 'reuse2026' }, await login(101))).status, 200);
+  const info = rows.find((r) => r.id === fresh.body.codes[0].id);
+  assert.equal(info.maxUses, 2);
+  assert.equal(info.state, 'active');
+  // 归档名不能被当作兑换码输入
+  assert.equal((await call('POST', '/api/attempts', { code: `REUSE2026#${old.id}` }, await login(102))).status, 400);
+  // 已归档的旧码不能恢复（它的名字已经不能被输入）
+  assert.equal((await admin('POST', `/api/admin/codes/${old.id}/restore`)).status, 409);
+  // 过期的旧码同样可以被同名新码取代
+  const exp = (await admin('POST', '/api/admin/codes', { kind: 'shared', customCode: 'SHORTLIVED', hours: 0.0004 })).body.codes[0];
+  await new Promise((r) => setTimeout(r, 1700));
+  const again = await admin('POST', '/api/admin/codes', { kind: 'shared', customCode: 'shortlived' });
+  assert.equal(again.status, 200);
+  assert.notEqual(again.body.codes[0].id, exp.id);
+});
+
 test('错误次数过多会被限速', async () => {
-  const t = await login(30);
-  let last;
-  for (let i = 0; i < 31; i++) last = await call('POST', '/api/attempts', { code: 'ZZZZ-ZZZZ' }, t);
-  assert.equal(last.status, 429);
+  const s2 = createApp({ dbPath: ':memory:', adminPassword: 'admin-pass', config: { requireCode: true, enterPerMin: 100000 } });
+  await new Promise((r) => s2.listen(0, '127.0.0.1', r));
+  const b2 = `http://127.0.0.1:${s2.address().port}`;
+  try {
+    const t = (await (await fetch(b2 + '/api/enter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'L', email: 'l@x.com', key: 'secret1' }) })).json()).token;
+    let last;
+    for (let i = 0; i < 31; i++) last = await fetch(b2 + '/api/attempts', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t }, body: JSON.stringify({ code: 'ZZZZ-ZZZZ' }) });
+    assert.equal(last.status, 429);
+  } finally { await new Promise((r) => s2.close(r)); }
 });
