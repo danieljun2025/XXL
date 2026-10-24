@@ -10,8 +10,7 @@
 
 | 项目 | 地址 | 说明 |
 |---|---|---|
-| 首页清单 | `https://matchgamers.com/` | GitHub Pages，列出所有项目 |
-| 消消乐 | `https://matchgamers.com/game/xxl/` | 原来的小游戏，原样保留 |
+| 首页 | `https://matchgamers.com/` | GitHub Pages，职业锚测试介绍页，按钮指向完整版 |
 | 职业锚测试（完整版） | `https://anchor.matchgamers.com/` | Render 上的 Node 服务，结果保存在服务器，**主推这个** |
 | 职业锚测试（静态备用版） | `https://matchgamers.com/career-anchor/` | 纯前端，数据只在答题者浏览器里，首页不链接，**不用来卖** |
 | 管理后台 | `https://anchor.matchgamers.com/admin.html` | 需管理员口令 |
@@ -31,7 +30,7 @@
 2. **开发完整版**：Node + SQLite 服务，40 题、8 个职业锚、报告、后台、导出 CSV、自动测试。
 3. **去掉邮件**：邮箱 + 自设「查看密钥」代替邮件验证；忘记密钥由管理员重置。
 4. **静态版**：为了能放 GitHub Pages，做了纯前端版（只填名字，不用后端），并加了「保存为图片」。
-5. **站点整合**：首页做成项目清单；消消乐移到 `/game/xxl/`；删掉重复/旧页面（`mvp.html`、`poc.html`）。
+5. **站点整合**：首页一度做成项目清单，消消乐移到 `/game/xxl/`；之后决定只保留职业锚测试，**消消乐已整体移除**（可从提交 824a4a4 之前的历史找回），首页改为介绍页。
 6. **域名与证书**：域名在 Cloudflare，4 条 A 记录 + `www` CNAME 指向 GitHub Pages（全部 DNS only）；GitHub Pages 自动签发 HTTPS 证书。
 7. **部署完整版到 Render**：用仓库里的 `render.yaml` + `Dockerfile`，Starter 档 + 1GB 磁盘；子域名 `anchor.matchgamers.com` 用 CNAME 指向 Render（DNS only）。
 8. **每页 10 题**：40 题分 4 页显示。
@@ -85,8 +84,7 @@
 ## 5. 目录结构
 
 ```
-index.html            首页清单（GitHub Pages）
-game/xxl/             消消乐
+index.html            首页介绍页（GitHub Pages）
 career-anchor/        静态备用版（由 tools/build-static.js 生成，勿手改）
 public/               完整版前端：index.html app.js style.css admin.* report.* charts.js codes.* teams.* team.*
 server/               Node 服务：server.js db.js scoring.js data/(questions, anchors, config)

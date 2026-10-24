@@ -7,7 +7,7 @@
 1. 合并分支到主分支（`main`）。
 2. 仓库 Settings → Pages → Source 选 `Deploy from a branch`，Branch 选 `main` / `(root)`。
 3. 根目录的 `CNAME` 文件决定自定义域名（当前为 `matchgamers.com`），按需修改并在域名解析处配置。
-4. 网站首页 `/` 仍是原来的消消乐，职业锚测试在 `/career-anchor/`。
+4. 网站首页 `/` 是职业锚测试的介绍页，按钮指向 `anchor.matchgamers.com`；`/career-anchor/` 是静态备用版。
 
 修改题目或文案后，重新生成页面再提交：
 ```bash
