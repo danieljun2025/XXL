@@ -124,6 +124,7 @@ test('后台报表：汇总数据与权限', async () => {
   assert.equal(r.body.days.length, 30);
   assert.equal(r.body.days.reduce((a, d) => a + d.count, 0), r.body.submitted);
   assert.equal(Object.keys(r.body.primary).length, 8);
+  assert.equal(r.body.durationBins.reduce((a, b) => a + b.count, 0), r.body.submitted);
   assert.ok(r.body.avgScores.TF >= 1 && r.body.avgScores.TF <= 8.4);
   assert.ok(r.body.completionRate > 0 && r.body.completionRate <= 1);
   assert.ok(!JSON.stringify(r.body).includes('@'));

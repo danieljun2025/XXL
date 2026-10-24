@@ -316,6 +316,9 @@ function createApp(opts = {}) {
         mins.sort((x, y) => x - y);
         const days = [];
         for (let i = 29; i >= 0; i--) { const k = dayKey(now() - i * 86400000); days.push({ date: k, count: perDay[k] || 0 }); }
+        const edges = [5, 10, 15, 20, 30];
+        const bins = ['<5 分', '5–10 分', '10–15 分', '15–20 分', '20–30 分', '30 分以上'].map((label) => ({ label, count: 0 }));
+        for (const m of mins) bins[edges.filter((e) => m >= e).length].count++;
         const drafts = rows.length - done.length;
         const avg = Object.fromEntries(ANCHOR_ORDER.map((c) => [c, done.length ? Math.round((sum[c] / done.length) * 10) / 10 : null]));
         return send(res, 200, {
@@ -325,7 +328,7 @@ function createApp(opts = {}) {
           last7: days.slice(-7).reduce((a, d) => a + d.count, 0),
           medianMinutes: mins.length ? Math.round(mins[Math.floor(mins.length / 2)] * 10) / 10 : null,
           retakers: [...doneBy.values()].filter((n) => n > 1).length,
-          primary, avgScores: avg, days,
+          primary, avgScores: avg, days, durationBins: bins,
         });
       }
       if (method === 'GET' && p === '/api/admin/attempts/export.csv') {
