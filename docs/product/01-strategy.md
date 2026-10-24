@@ -18,10 +18,10 @@
 | 渠道 | 角色 | 内容/动作 | 成交 |
 |---|---|---|---|
 | **闲鱼** | 成交渠道 | 三条商品（基础版/解读版/团队版），自动发码，闲鱼内沟通 | 闲鱼 |
-| **小红书** | 获客与信任 | 每周 3 篇：科普、场景、自测体验、工具清单 | 导向闲鱼成交 |
+| **小红书** | 内容与信任（独立运营，**不跨平台导流**） | 每周 3 篇：科普、场景、自测体验、工具清单；不出现任何他处信息 | 暂不成交；后续评估官方路径（店铺/留资） |
 | 后续（观察） | 口碑与团队客户 | 好评、买家分享报告图、培训/班级的转介绍 | 闲鱼或线下约定 |
 
-详细见 [launch/xianyu-listing-pack.md](launch/xianyu-listing-pack.md) 和 [launch/xiaohongshu-playbook.md](launch/xiaohongshu-playbook.md)。
+两个平台都用**单独的业务账号**。规则核查与红线见 [launch/platform-rules-check.md](launch/platform-rules-check.md)；详细内容见 [launch/xianyu-listing-pack.md](launch/xianyu-listing-pack.md) 和 [launch/xiaohongshu-playbook.md](launch/xiaohongshu-playbook.md)。
 
 ## 价值主张
 1. **快**：40 题约 10 分钟，立刻出报告。
