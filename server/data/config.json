@@ -1,6 +1,6 @@
 {
   "top3Bonus": true,
-  "pageSize": 5,
+  "pageSize": 10,
   "sessionHours": 2,
   "maxFailedLogins": 5,
   "lockMinutes": 15
