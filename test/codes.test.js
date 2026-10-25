@@ -158,6 +158,19 @@ test('通用码：到期后不能用，延长有效期后恢复；作废立即�
   assert.equal((await admin('POST', `/api/admin/codes/${c.id}/extend`, { hours: 3 })).status, 409);
 });
 
+test('有效期可以改成不限时（留空）；作废的码不能改', async () => {
+  const c = (await admin('POST', '/api/admin/codes', { kind: 'shared', hours: 2 })).body.codes[0];
+  const exp = () => admin('GET', '/api/admin/codes').then((r) => r.body.rows.find((x) => x.id === c.id).expiresAt);
+  assert.ok(await exp());
+  const r = await admin('POST', `/api/admin/codes/${c.id}/extend`, { hours: '' });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.expiresAt, null);
+  assert.equal(await exp(), null);
+  assert.equal((await admin('POST', `/api/admin/codes/${c.id}/extend`, { hours: 0 })).status, 400);
+  await admin('POST', `/api/admin/codes/${c.id}/void`);
+  assert.equal((await admin('POST', `/api/admin/codes/${c.id}/extend`, { hours: '' })).status, 409);
+});
+
 test('一次性码也可以设置有效期', async () => {
   const c = (await admin('POST', '/api/admin/codes', { count: 1, hours: 0.0004 })).body.codes[0];
   await new Promise((r) => setTimeout(r, 1700));

@@ -633,6 +633,11 @@ function createApp(opts = {}) {
           return send(res, 200, { ok: true, maxUses });
         }
         const body = await readJson(req);
+        if (body.hours === '' || body.hours === null) { // 留空 = 取消有效期限制
+          const r0 = db.prepare('UPDATE codes SET expires_at=NULL WHERE id=? AND voided=0').run(id);
+          if (!r0.changes) throw new HttpError(409, '已作废的兑换码不能修改有效期');
+          return send(res, 200, { ok: true, expiresAt: null });
+        }
         const h = Number(body.hours);
         if (!(h > 0 && h <= 24 * 365)) throw new HttpError(400, '有效时长需大于 0 且不超过 8760 小时');
         const r = db.prepare('UPDATE codes SET expires_at=? WHERE id=? AND voided=0').run(now() + Math.round(h * 3600_000), id);

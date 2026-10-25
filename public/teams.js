@@ -48,7 +48,7 @@
       <section class="panel"><h2>全部团队</h2><div class="tw"><table><thead><tr><th>团队</th><th>成员</th><th>团队码</th><th>负责人可看姓名</th><th>状态</th><th>操作</th></tr></thead><tbody>
         ${teams.map((t) => `<tr><td><b>${esc(t.name)}</b>${t.note ? `<br><span class="muted">${esc(t.note)}</span>` : ''}<br><span class="muted">创建于 ${fmt(t.createdAt)}</span></td>
           <td>${t.submitted} 人完成<br><span class="muted">参与 ${t.members}，进行中 ${t.drafts}</span></td>
-          <td>${t.codes.map((c) => `<span class="chip mono">${esc(c.code)}${c.kind === 'shared' ? ` ${c.uses}${c.maxUses ? '/' + c.maxUses : ''}人` : ''}${c.voided ? ' 已作废' : ''}</span>`).join('') || '<span class="muted">无</span>'}</td>
+          <td>${t.codes.map((c) => `<div class="cline"><span class="chip mono">${esc(c.code)}${c.kind === 'shared' ? ` ${c.uses}${c.maxUses ? '/' + c.maxUses : ''}人` : ''}${c.voided ? ' 已作废' : ''}</span><span class="muted small">${c.voided ? '' : c.expiresAt ? '到期 ' + fmt(c.expiresAt) : '不限时'}</span>${c.voided ? '' : `${c.kind === 'shared' ? `<button class="ghost" data-clim="${c.id}" data-cur="${c.maxUses || ''}">人数上限</button>` : ''}<button class="ghost" data-cext="${c.id}">有效期</button>`}</div>`).join('') || '<span class="muted">无</span>'}</td>
           <td><label class="chk" style="margin:0"><input type="checkbox" data-sn="${t.id}" ${t.shareNames ? 'checked' : ''}> ${t.shareNames ? '是' : '否'}</label></td>
           <td><span class="pill ${t.closed ? 'off' : 'on'}">${t.closed ? '已关闭' : '开放'}</span></td>
           <td><a class="btn" href="/report.html?team=${t.id}">查看报告</a><a class="btn" href="/codes.html?team=${t.id}">生成码</a><button class="ghost" data-cl="${t.id}" data-to="${t.closed ? 0 : 1}">${t.closed ? '重新开放' : '关闭'}</button><button class="ghost" data-rk="${t.id}">重新生成报告码</button><button class="ghost" data-rn="${t.id}" data-name="${esc(t.name)}">改名</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted">还没有团队，先在上面创建一个。</td></tr>'}
@@ -67,6 +67,18 @@
     const done = (ok) => { const m = document.getElementById('cpm'); if (m) m.textContent = ok ? '已复制' : '浏览器不允许自动复制，请手动选中复制'; };
     const cpk = document.getElementById('cpk'); if (cpk) cpk.onclick = () => copy(link(shown.reportKey), done);
     const cpc = document.getElementById('cpc'); if (cpc) cpc.onclick = () => copy(shown.code.code, done);
+    app.querySelectorAll('[data-clim]').forEach((b) => (b.onclick = async () => {
+      const v = prompt('这个团队码最多使用人数（留空 = 不限）。可以随时调高或调低；低于已用人数时不再发放，已使用的人不受影响。', b.dataset.cur);
+      if (v === null) return;
+      try { await api('POST', `/api/admin/codes/${b.dataset.clim}/limit`, { maxUses: v.trim() === '' ? '' : Number(v) }); msg = ''; } catch (er) { msg = er.message; }
+      load();
+    }));
+    app.querySelectorAll('[data-cext]').forEach((b) => (b.onclick = async () => {
+      const h = prompt('从现在起，这个团队码再有效多少小时？（72 = 3 天；留空 = 不限时）', '72');
+      if (h === null) return;
+      try { await api('POST', `/api/admin/codes/${b.dataset.cext}/extend`, { hours: h.trim() === '' ? '' : Number(h) }); msg = ''; } catch (er) { msg = er.message; }
+      load();
+    }));
     app.querySelectorAll('[data-sn]').forEach((c) => (c.onchange = async () => {
       if (c.checked && !confirm('开启后，负责人将能看到成员的姓名和主职业锚。之后加入的成员会被告知；已加入的成员加入时看到的是"只看汇总"的说明。确定开启？')) { c.checked = false; return; }
       try { await api('POST', `/api/admin/teams/${c.dataset.sn}/update`, { shareNames: c.checked }); msg = ''; } catch (er) { msg = er.message; }
