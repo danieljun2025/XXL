@@ -87,9 +87,9 @@
     };
     app.querySelectorAll('[data-cp]').forEach((b) => (b.onclick = () => copy(b.dataset.cp, (ok) => { b.textContent = ok ? '已复制' : '复制失败'; setTimeout(() => (b.textContent = '复制'), 1200); })));
     app.querySelectorAll('[data-ext]').forEach((b) => (b.onclick = async () => {
-      const h = prompt('从现在起，再有效多少小时？（可填小数，如 0.5）', '3');
+      const h = prompt('从现在起，再有效多少小时？（可填小数，如 0.5；72 = 3 天；留空 = 不限时）', '3');
       if (h === null) return;
-      try { await api('POST', `/api/admin/codes/${b.dataset.ext}/extend`, { hours: Number(h) }); msg = ''; } catch (er) { msg = er.message; }
+      try { await api('POST', `/api/admin/codes/${b.dataset.ext}/extend`, { hours: h.trim() === '' ? '' : Number(h) }); msg = ''; } catch (er) { msg = er.message; }
       load();
     }));
     app.querySelectorAll('[data-lim]').forEach((b) => (b.onclick = async () => {
