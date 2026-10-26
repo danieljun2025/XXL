@@ -33,7 +33,7 @@
   }
 
   function draw(teams) {
-    app.innerHTML = `<div class="crumb"><a href="/admin.html">← 返回管理后台</a></div><h1>团队管理</h1>
+    app.innerHTML = `<h1>团队管理</h1>
       <section class="panel"><h2>创建团队</h2>
         <p class="muted">一个团队对应一个客户（公司、班级、培训营）。成员用「团队码」答题，负责人用「团队报告码」只看本团队的汇总。</p>
         <form id="g"><div class="gen"><div><label for="tn">团队名称</label><input id="tn" type="text" maxlength="60" required placeholder="如 销售一部"></div>
