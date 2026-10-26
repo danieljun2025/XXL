@@ -1,0 +1,112 @@
+const { chromium } = require('playwright');
+const fs = require('fs'); const path = require('path');
+const root = '/home/user/XXL';
+const A = JSON.parse(fs.readFileSync(root + '/server/data/anchors.json', 'utf8'));
+const ORDER = ['TF', 'GM', 'AU', 'SE', 'EC', 'SV', 'CH', 'LS'];
+const EN = { TF: 'Technical/Functional', GM: 'General Managerial', AU: 'Autonomy/Independence', SE: 'Security/Stability', EC: 'Entrepreneurial Creativity', SV: 'Service/Dedication', CH: 'Pure Challenge', LS: 'Lifestyle' };
+const OUT = root + '/docs/product/launch/xhs-notes/images';
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const CSS = `
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1080px;height:1440px;font-family:"Noto Sans CJK SC","PingFang SC","Microsoft YaHei",sans-serif;color:#16202c;-webkit-font-smoothing:antialiased}
+.page{position:relative;width:1080px;height:1440px;overflow:hidden;background:#f4f7fb;padding:84px 84px 0}
+.cover{background:#0f1b33;color:#fff}
+.series{font-size:30px;letter-spacing:4px;color:#7fa6ff;font-weight:600}
+.cover .series{color:#8fb0ff}
+h1{font-size:128px;line-height:1.14;font-weight:800;letter-spacing:-2px}
+h2{font-size:68px;line-height:1.25;font-weight:800;letter-spacing:-1px}
+.sub{font-size:44px;line-height:1.5;color:#c6d4f5;margin-top:36px}
+.foot{position:absolute;left:84px;right:84px;bottom:56px;display:flex;justify-content:space-between;font-size:28px;color:#7a8799}
+.cover .foot{color:#8a9bbd}
+.chip{display:inline-flex;align-items:center;justify-content:center;background:#2f6fed;color:#fff;font-weight:800;border-radius:16px}
+.card{background:#fff;border-radius:36px;padding:34px 40px;border:2px solid #e3e9f3}
+.lbl{font-size:26px;font-weight:700;color:#2f6fed;letter-spacing:1px}
+.lbl.warn{color:#c2410c}
+.txt{font-size:32px;line-height:1.5;color:#1f2a37}
+.note{font-size:28px;color:#6b7788;line-height:1.55}
+.big{font-size:44px;line-height:1.6;color:#1f2a37}
+.hl{color:#2f6fed;font-weight:800}
+.pill{display:inline-block;background:#e8f0fe;color:#2f6fed;border-radius:99px;padding:6px 24px;font-size:28px;font-weight:700}
+`;
+const wrap = (cls, inner, n, total, series) => `<!doctype html><html><head><meta charset="utf-8"><style>${CSS}</style></head><body><div class="page ${cls}">${cls === 'cover' ? inner : `<div id="fit" style="width:912px">${inner}</div>`}<div class="foot"><span>${series}</span><span>${n} / ${total}</span></div></div></body></html>`;
+
+// ---------- 笔记 4–8（第二批）----------
+const DISC = '<div class="note" style="margin-top:36px">职业锚仅作为自我认知参考，不构成任何决策依据。</div>';
+const cover = (title, sub, extra = '') => ['cover', `<div class="series">职业锚小课堂</div><h1 style="margin-top:70px">${title}</h1><div class="sub">${sub}</div>${extra}`];
+const cards = (items, size = 38) => `<div style="display:grid;gap:24px">${items.map((t) => `<div class="card txt" style="font-size:${size}px;line-height:1.55">${t}</div>`).join('')}</div>`;
+const titled = (items) => `<div style="display:grid;gap:22px">${items.map(([a, b]) => `<div class="card"><div style="font-size:42px;font-weight:800;color:#2f6fed">${a}</div><div class="txt" style="margin-top:8px">${b}</div></div>`).join('')}</div>`;
+const numbered = (items) => `<div style="display:grid;gap:22px">${items.map((t, i) => `<div class="card" style="display:flex;gap:26px;align-items:center"><span class="chip" style="min-width:72px;height:72px;font-size:42px;border-radius:50%">${i + 1}</span><span style="font-size:38px;line-height:1.5">${t}</span></div>`).join('')}</div>`;
+const page = (kicker, h, body) => ['', `<div class="series">${kicker}</div><h2 style="margin-top:20px">${h}</h2><div style="margin-top:46px">${body}</div>`];
+const end = (q) => ['', `<div class="series">最后</div><h2 style="margin-top:20px">聊聊你的看法</h2><div class="card" style="margin-top:56px;font-size:44px;line-height:1.7">${q} 👇</div>${DISC}`];
+const two = (a, b) => `<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">${[a, b].map(([l, t, w]) => `<div class="card"><div class="lbl ${w ? 'warn' : ''}">${l}</div><div class="txt">${t}</div></div>`).join('')}</div>`;
+
+// 笔记 4：安全型
+const note4 = [
+  cover('总在跳槽<br>边缘退回来？', '可能是<span style="color:#8fb0ff;font-weight:800">安全/稳定型</span><br>在起作用'),
+  page('先说结论', '不是懒，<br>也不是没出息', `<div class="big">有人看到更好的机会，却总在最后一步犹豫、退回来。<br><br>这未必是缺乏魄力，更可能是：<span class="hl">稳定与可预期</span>，对他来说是核心需求。</div><div class="note" style="margin-top:40px">${esc(A.SE.definition)}</div>`),
+  page('安全/稳定型的优势', '稳，本身是能力', cards(A.SE.strengths.map(esc)) + `<div class="note" style="margin-top:34px">适合：${esc(A.SE.fit[0])}；${esc(A.SE.fit[2])}</div>`),
+  page('容易踩的坑', '这 3 点，值得留意', cards(A.SE.blindspots.map(esc))),
+  page('3 个自查问题', '你是不是这种类型？', numbered(['看到不确定的机会，我第一反应是兴奋，还是担心？', '如果收入明年可能波动，我会睡不好吗？', '我更看重"能长期做下去"，还是"能快速成长"？'])),
+  page('给安全型的建议', '把"稳"变成底气', titled([['稳在能力上', esc(A.SE.advice[0].replace(/'/g, '"'))], ['小步试变化', esc(A.SE.advice[1])], ['定期看前景', esc(A.SE.advice[2])]])),
+  end('你更看重"稳定"还是"成长"？<br>当时是怎么选的？'),
+];
+// 笔记 5：跳槽 5 问
+const note5 = [
+  cover('跳槽前先问<br>自己这 5 个<br>问题', '用职业锚，筛掉<br>"看起来很好"的 offer'),
+  page('先想一想', '薪资高了，<br>为什么反而更累？', `<div class="big">因为 offer 比的往往是<span class="hl">薪资、头衔、公司名气</span>，<br>却没有比：这份工作能不能满足你<span class="hl">最不愿放弃的那一项</span>。</div><div class="note" style="margin-top:40px">下面 5 个问题，可以在每次面对新机会时拿出来问自己。</div>`),
+  page('问题 1–3', '先看自己', numbered(['我最不愿放弃的是什么？（技术精进、自由、稳定、意义……）', '这份新工作能满足它吗？还是要拿它去换薪水？', '半年后、两年后，我还会在乎这一点吗？'])),
+  page('问题 4–5', '再看这份工作', numbered(['日常的一天会是什么样？和我"理想的一天"差多少？', '如果最糟的一点成真了，我能接受吗？'])),
+  page('用起来', '怎么筛 offer', two(['有明显冲突', '最高的一两项职业锚被长期压制，要慎重', 1], ['基本匹配', '核心需求能被满足，其他因素可以权衡', 0]) + `<div class="note" style="margin-top:34px">例：重视自主的人，面对审批繁琐、监督密集的岗位，要多想一想；重视稳定的人，面对前景高度不确定的岗位，也一样。</div>`),
+  end('你上次换工作，最看重的是哪一点？<br>现在回头看，对吗？'),
+];
+// 笔记 6：自主型
+const note6 = [
+  cover('自主型的人<br>为什么受不了<br>大厂流程', '不是不努力，<br>是被束缚了'),
+  page('先说一个现象', '事事审批，<br>就是觉得憋得慌', `<div class="big">有人在流程里如鱼得水，有人却越做越闷。<br><br>可能是<span class="hl">自主/独立型</span>：最在意<span class="hl">按自己的方式和节奏做事</span>。</div><div class="note" style="margin-top:40px">${esc(A.AU.motivation)}</div>`),
+  page('自主型的优势', '不用盯，也能出活', cards(A.AU.strengths.map(esc))),
+  page('最难受的环境', '这些，容易让他透不过气', cards(['流程繁琐、事事需要审批', '监督密集、过程比结果更重要', '没有边界的"随时响应"'])),
+  page('更适合的环境', '给他空间，他回报结果', cards(A.AU.fit.map(esc))),
+  page('3 条建议', '在大厂里，也能活得舒服', titled([['争取结果导向', '和上级对齐目标，用成果而非过程考核'], ['主动同步进度', '减少他人对"失控"的担忧，换取更多信任'], ['准备 B 方案', '为收入与发展的不确定性留好后手']])),
+  end('你受不了的"流程"是哪一种？<br>你是怎么应对的？'),
+];
+// 笔记 7：创业型
+const note7 = [
+  cover('你适合创业吗？<br>先别被<br>创业热带跑', '看看自己是不是<br><span style="color:#8fb0ff;font-weight:800">创业/创造型</span>'),
+  page('先分清', '想创业 ≠ 适合创业', `<div class="big">创业型的核心，不是"想当老板"，而是：<span class="hl">把想法变成现实，亲手创造点什么</span>。</div><div class="note" style="margin-top:40px">${esc(A.EC.definition)}</div>`),
+  page('创业型的特征', '这些，你有几条？', cards(A.EC.strengths.map(esc))),
+  page('但也要看到', '3 个容易忽略的坑', cards(A.EC.blindspots.map(esc))),
+  page('小步试验法', '先试，再大投入', numbered(['把想法缩小成一个最小的版本', '用业余时间、小预算试 1–3 个月', '看真实反馈，再决定加不加码', '设好止损线，保留基本现金和退路'])),
+  page('不想辞职？', '也可以先在这些地方练手', cards(A.EC.fit.slice(0, 3).map(esc)) + `<div class="note" style="margin-top:34px">也可以是公司内部的新业务、小项目。</div>`),
+  end('你想做的是什么？<br>最大的顾虑又是什么？'),
+];
+// 笔记 8：三种被误解
+const note8 = [
+  cover('被误解最多的<br>3 种人', '<span style="color:#8fb0ff;font-weight:800">服务型 · 挑战型 · 生活方式型</span><br>有人要意义，有人要难题，有人要生活'),
+  page('先说一个提醒', '"不上进"，<br>往往是误解', `<div class="big">每种职业锚都有自己的"上进"方式：<br>只是<span class="hl">追求的东西不一样</span>。</div><div class="note" style="margin-top:40px">下面 3 种，最容易被贴标签。</div>`),
+  page('服务/奉献型', '常被说"太理想化"', two(['核心动机', esc(A.SV.motivation)], ['容易被误解成', '"不现实"、"不赚钱"', 1]) + `<div class="card" style="margin-top:24px"><div class="lbl warn">要留意</div><div class="txt">${esc(A.SV.advice[1])}</div></div>`),
+  page('挑战型', '常被说"爱较劲"', two(['核心动机', esc(A.CH.motivation)], ['容易被误解成', '"好胜"、"不合群"', 1]) + `<div class="card" style="margin-top:24px"><div class="lbl warn">要留意</div><div class="txt">${esc(A.CH.advice[0])}</div></div>`),
+  page('生活方式型', '常被说"没进取心"', two(['核心动机', esc(A.LS.motivation)], ['容易被误解成', '"不够拼"、"缺乏野心"', 1]) + `<div class="card" style="margin-top:24px"><div class="lbl warn">要留意</div><div class="txt">${esc(A.LS.advice[1])}</div></div>`),
+  end('你有被贴过标签吗？<br>实际的你，是什么样的？'),
+];
+
+(async () => {
+  const b = await chromium.launch(); const p = await (await b.newContext({ viewport: { width: 1080, height: 1440 }, deviceScaleFactor: 1 })).newPage();
+  const sets = [['note4', note4, '职业锚小课堂 · 04'], ['note5', note5, '职业锚小课堂 · 05'], ['note6', note6, '职业锚小课堂 · 06'], ['note7', note7, '职业锚小课堂 · 07'], ['note8', note8, '职业锚小课堂 · 08']];
+  for (const [name, pages, series] of sets) {
+    for (let i = 0; i < pages.length; i++) {
+      const [cls, inner] = pages[i];
+      await p.setContent(wrap(cls, inner, String(i + 1).padStart(2, '0'), String(pages.length).padStart(2, '0'), series));
+      await p.evaluate(() => {
+        const el = document.getElementById('fit'); if (!el) return;
+        const avail = 1440 - 84 - 150; let lo = 1, hi = 2.0;
+        for (let k = 0; k < 14; k++) { const m = (lo + hi) / 2; el.style.zoom = m; el.style.width = 912 / m + 'px'; if (el.getBoundingClientRect().height <= avail) lo = m; else hi = m; }
+        el.style.zoom = lo; el.style.width = 912 / lo + 'px';
+      });
+      await p.waitForTimeout(80);
+      await p.screenshot({ path: `${OUT}/${name}-${String(i + 1).padStart(2, '0')}.png` });
+    }
+    console.log(name, pages.length, '张');
+  }
+  await b.close();
+})();
