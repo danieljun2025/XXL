@@ -1,0 +1,135 @@
+const { chromium } = require('playwright');
+const fs = require('fs'); const path = require('path');
+const root = '/home/user/XXL';
+const A = JSON.parse(fs.readFileSync(root + '/server/data/anchors.json', 'utf8'));
+const ORDER = ['TF', 'GM', 'AU', 'SE', 'EC', 'SV', 'CH', 'LS'];
+const EN = { TF: 'Technical/Functional', GM: 'General Managerial', AU: 'Autonomy/Independence', SE: 'Security/Stability', EC: 'Entrepreneurial Creativity', SV: 'Service/Dedication', CH: 'Pure Challenge', LS: 'Lifestyle' };
+const OUT = root + '/docs/product/launch/xhs-notes/images';
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const CSS = `
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1080px;height:1440px;font-family:"Noto Sans CJK SC","PingFang SC","Microsoft YaHei",sans-serif;color:#16202c;-webkit-font-smoothing:antialiased}
+.page{position:relative;width:1080px;height:1440px;overflow:hidden;background:#f4f7fb;padding:84px 84px 0}
+.cover{background:#0f1b33;color:#fff}
+.series{font-size:30px;letter-spacing:4px;color:#7fa6ff;font-weight:600}
+.cover .series{color:#8fb0ff}
+h1{font-size:128px;line-height:1.14;font-weight:800;letter-spacing:-2px}
+h2{font-size:68px;line-height:1.25;font-weight:800;letter-spacing:-1px}
+.sub{font-size:44px;line-height:1.5;color:#c6d4f5;margin-top:36px}
+.foot{position:absolute;left:84px;right:84px;bottom:56px;display:flex;justify-content:space-between;font-size:28px;color:#7a8799}
+.cover .foot{color:#8a9bbd}
+.chip{display:inline-flex;align-items:center;justify-content:center;background:#2f6fed;color:#fff;font-weight:800;border-radius:16px}
+.card{background:#fff;border-radius:36px;padding:34px 40px;border:2px solid #e3e9f3}
+.lbl{font-size:26px;font-weight:700;color:#2f6fed;letter-spacing:1px}
+.lbl.warn{color:#c2410c}
+.txt{font-size:32px;line-height:1.5;color:#1f2a37}
+.note{font-size:28px;color:#6b7788;line-height:1.55}
+.big{font-size:44px;line-height:1.6;color:#1f2a37}
+.hl{color:#2f6fed;font-weight:800}
+.pill{display:inline-block;background:#e8f0fe;color:#2f6fed;border-radius:99px;padding:6px 24px;font-size:28px;font-weight:700}
+`;
+const wrap = (cls, inner, n, total, series) => `<!doctype html><html><head><meta charset="utf-8"><style>${CSS}</style></head><body><div class="page ${cls}">${cls === 'cover' ? inner : `<div id="fit" style="width:912px">${inner}</div>`}<div class="foot"><span>${series}</span><span>${n} / ${total}</span></div></div></body></html>`;
+
+// ---------- 笔记 1：8 种职业锚 ----------
+function anchorCard(c) {
+  const a = A[c];
+  return `<div class="card" style="margin-bottom:22px">
+    <div style="display:flex;align-items:center;gap:22px;margin-bottom:14px"><span class="chip" style="width:104px;height:64px;font-size:36px">${c}</span><span style="font-size:52px;font-weight:800">${esc(a.name)}</span><span style="font-size:24px;color:#8a95a5;margin-left:auto">${esc(EN[c])}</span></div>
+    <div class="txt" style="margin-bottom:12px">${esc(a.definition)}</div>
+    <div style="margin-top:8px"><span class="lbl">核心动机</span><div class="txt">${esc(a.motivation)}</div></div>
+    <div style="margin-top:10px"><span class="lbl">适合的环境</span><div class="txt">${esc(a.fit[0])}</div></div>
+    <div style="margin-top:10px"><span class="lbl warn">容易踩的坑</span><div class="txt">${esc(a.blindspots[0])}</div></div></div>`;
+}
+const S1 = '职业锚小课堂 · 01';
+const note1 = [
+  ['cover', `<div class="series">职业锚小课堂</div><h1 style="margin-top:70px">8 种<br>职业锚<br><span style="color:#8fb0ff">一张图看懂</span></h1><div class="sub">你最不愿意放弃的，<br>到底是什么？</div>
+    <div style="position:absolute;left:84px;right:84px;bottom:190px;display:grid;grid-template-columns:repeat(4,1fr);gap:22px">${ORDER.map((c) => `<div style="background:#1b2c52;border-radius:24px;padding:26px 0;text-align:center"><div style="font-size:46px;font-weight:800;color:#fff">${c}</div><div style="font-size:24px;color:#9db4e6;margin-top:6px">${esc(A[c].name.replace('型', ''))}</div></div>`).join('')}</div>`],
+  ['', `<div class="series">先搞清楚</div><h2 style="margin-top:20px">什么是职业锚？</h2>
+    <div class="big" style="margin-top:50px">职业锚，是你在职业选择中<span class="hl">最不愿意放弃的那个核心动机</span>。</div>
+    <div class="note" style="margin-top:30px">这个概念由麻省理工学院的埃德加·沙因（Edgar Schein）提出，用来帮助人们看清自己真正看重什么。</div>
+    <div style="margin-top:60px;display:grid;gap:22px">${[['一共 8 种', '大多数人有一两种最突出'], ['没有好坏', '只有适合与否'], ['不是能力', '而是你做取舍时的"底线"']].map(([a, b]) => `<div class="card" style="display:flex;align-items:center;gap:26px"><span class="pill">${a}</span><span style="font-size:38px">${b}</span></div>`).join('')}</div>`],
+  ...[['TF', 'GM'], ['AU', 'SE'], ['EC', 'SV'], ['CH', 'LS']].map((pair, i) => ['', `<div class="series" style="margin-bottom:14px">第 ${i + 1} / 4 组</div>${pair.map(anchorCard).join('')}`]),
+  ['', `<div class="series">最后</div><h2 style="margin-top:20px">你更像哪一种？</h2>
+    <div class="big" style="margin-top:50px">回想一下：如果必须放弃一样，<br>你<span class="hl">最舍不得</span>的是——</div>
+    <div class="card" style="margin-top:50px;font-size:40px;line-height:1.8">技术上的精进？ 带团队的责任？<br>做事的自由？ 稳定的保障？<br>创造的快感？ 帮助他人？<br>啃硬骨头？ 生活的平衡？</div>
+    <div class="big" style="margin-top:50px">评论区说说你的答案，<br>我来看看有多少人和你一样 👇</div>
+    <div class="note" style="margin-top:36px">职业锚仅作为自我认知参考，不构成任何决策依据。</div>`],
+];
+
+// ---------- 笔记 2：被迫转管理 ----------
+const S2 = '职业锚小课堂 · 02';
+const row = (a, b, c) => `<div style="display:grid;grid-template-columns:230px 1fr 1fr;gap:0;border-top:2px solid #e3e9f3"><div style="padding:26px 12px;font-size:30px;font-weight:700;color:#6b7788">${a}</div><div style="padding:26px 22px;font-size:33px;line-height:1.45;background:#f3f7ff">${b}</div><div style="padding:26px 22px;font-size:33px;line-height:1.45">${c}</div></div>`;
+const note2 = [
+  ['cover', `<div class="series">职业锚小课堂</div><h1 style="margin-top:70px">被迫<br>转管理？</h1><div class="sub" style="font-size:56px;color:#fff;margin-top:50px">先看看你的<br><span style="color:#8fb0ff;font-weight:800">职业锚</span></div><div class="sub" style="margin-top:60px">升职了，却更不开心——<br>也许不是你不努力。</div>`],
+  ['', `<div class="series">你是不是也这样</div><h2 style="margin-top:20px">升职之后，<br>反而更累了？</h2>
+    <div style="margin-top:56px;display:grid;gap:26px">${['每天都在开会、协调、救火，却想不起上次认真做成一件事是什么时候', '别人觉得你"有前途"，你自己却开始怀念以前埋头做事的日子', '明明薪资和头衔都涨了，周日晚上还是睡不着'].map((t) => `<div class="card txt" style="font-size:38px;line-height:1.55">${t}</div>`).join('')}</div>
+    <div class="big" style="margin-top:54px">这可能不是你<span class="hl">不够好</span>，<br>而是这条路和你的<span class="hl">核心动机</span>不一致。</div>`],
+  ['', `<div class="series">对照着看</div><h2 style="margin-top:20px">技术/职能型 vs 管理型</h2>
+    <div class="card" style="margin-top:44px;padding:0;overflow:hidden"><div style="display:grid;grid-template-columns:230px 1fr 1fr;background:#2f6fed;color:#fff;font-size:34px;font-weight:800"><div></div><div style="padding:24px 22px">技术/职能型</div><div style="padding:24px 22px">管理型</div></div>
+      ${row('成就感来自', '把一件事做到专业、精深', '让团队一起把事做成')}
+      ${row('理想的一天', '有整块时间深入钻研', '协调资源、做决策、推进')}
+      ${row('最怕', '被杂事和会议切碎', '无权无责、影响不到全局')}
+      ${row('升职意味着', '可能离专业越来越远', '责任和影响力变大')}</div>
+    <div class="note" style="margin-top:34px">两种都没有对错。哪一种更像你，取决于你最舍不得的是什么。</div>`],
+  ['', `<div class="series">先问自己</div><h2 style="margin-top:20px">3 个问题，<br>帮你看清方向</h2>
+    <div style="margin-top:50px;display:grid;gap:26px">${['最近一次"忘记时间"的工作，是在做什么？', '薪水一样的话，我更愿意带 5 个人，还是啃下最难的那件事？', '我想要的，是"影响更多人"，还是"把一件事做到极致"？'].map((t, i) => `<div class="card" style="display:flex;gap:28px;align-items:flex-start"><span class="chip" style="min-width:76px;height:76px;font-size:44px;border-radius:50%">${i + 1}</span><span style="font-size:40px;line-height:1.55">${t}</span></div>`).join('')}</div>
+    <div class="note" style="margin-top:40px">不用急着回答，写下来，过几天再看一遍。</div>`],
+  ['', `<div class="series">不想转？也有路</div><h2 style="margin-top:20px">4 条折中的路</h2>
+    <div style="margin-top:50px;display:grid;gap:22px">${[['争取专家序列', '看公司有没有资深/专家的晋升通道'], ['带事，不带人', '做技术负责人，对结果负责，少管人事'], ['设期限试一试', '给自己 3–6 个月，到期认真复盘再决定'], ['只留不排斥的部分', '比如带新人、做分享，把"管理"拆开接']].map(([a, b]) => `<div class="card"><div style="font-size:42px;font-weight:800;color:#2f6fed">${a}</div><div class="txt" style="margin-top:8px">${b}</div></div>`).join('')}</div>`],
+  ['', `<div class="series">最后</div><h2 style="margin-top:20px">没有标准答案</h2>
+    <div class="big" style="margin-top:50px">管理不是"更高级"，<br>专业也不是"没出息"。<br><span class="hl">找到你最不愿放弃的，再选路。</span></div>
+    <div class="card" style="margin-top:56px;font-size:42px;line-height:1.7">聊聊：你被迫转过管理吗？<br>当时是怎么选的？ 👇</div>
+    <div class="note" style="margin-top:40px">以上为一般性建议，仅作自我认知参考，不构成对任何个人的职业决策依据。</div>`],
+];
+
+// ---------- 笔记 3：雷达图读图 ----------
+const S3 = '职业锚小课堂 · 03';
+const SAMPLE = { TF: 3.0, GM: 3.0, AU: 4.0, SE: 2.0, EC: 6.8, SV: 5.8, CH: 5.8, LS: 2.0 };
+function radarSvg(size, labelsOn = true) {
+  const C = size / 2, R = size * 0.32, n = 8, MAX = 8.4;
+  const pt = (i, r) => { const t = -Math.PI / 2 + (2 * Math.PI * i) / n; return [C + r * Math.cos(t), C + r * Math.sin(t)]; };
+  const rings = [1 / 3, 2 / 3, 1].map((f) => `<polygon fill="none" stroke="#d9e2f1" stroke-width="2" points="${ORDER.map((_, i) => pt(i, R * f).join(',')).join(' ')}"/>`).join('');
+  const axes = ORDER.map((_, i) => `<line x1="${C}" y1="${C}" x2="${pt(i, R)[0]}" y2="${pt(i, R)[1]}" stroke="#d9e2f1" stroke-width="2"/>`).join('');
+  const poly = ORDER.map((c, i) => pt(i, (R * SAMPLE[c]) / MAX).join(',')).join(' ');
+  const top = [...ORDER].sort((a, b) => SAMPLE[b] - SAMPLE[a]).slice(0, 3);
+  const dots = ORDER.map((c, i) => { const [x, y] = pt(i, (R * SAMPLE[c]) / MAX); return `<circle cx="${x}" cy="${y}" r="${top.includes(c) ? 13 : 7}" fill="#2f6fed" stroke="#fff" stroke-width="4"/>`; }).join('');
+  const labels = ORDER.map((c, i) => { const [x, y] = pt(i, R + 62); return `<text x="${x}" y="${y - 8}" text-anchor="middle" font-size="32" font-weight="${top.includes(c) ? 800 : 500}" fill="${top.includes(c) ? '#16202c' : '#6b7788'}">${esc(A[c].name.replace('型', ''))}</text><text x="${x}" y="${y + 30}" text-anchor="middle" font-size="28" fill="${top.includes(c) ? '#2f6fed' : '#8a95a5'}" font-weight="700">${SAMPLE[c].toFixed(1)}</text>`; }).join('');
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${rings}${axes}<polygon points="${poly}" fill="rgba(47,111,237,.22)" stroke="#2f6fed" stroke-width="5" stroke-linejoin="round"/>${dots}${labels}</svg>`;
+}
+const tip = (n, title, body, extra = '') => ['', `<div class="series">读图第 ${n} 招</div><h2 style="margin-top:20px">${title}</h2><div class="big" style="margin-top:46px">${body}</div>${extra}`];
+const note3 = [
+  ['cover', `<div class="series">职业锚小课堂</div><h1 style="margin-top:70px">雷达图<br>别只看<br><span style="color:#8fb0ff">最高分</span></h1><div class="sub">读图 3 招，<br>看懂你的职业锚</div>
+    <div style="position:absolute;right:50px;bottom:150px;opacity:.9"><svg width="460" height="460" viewBox="0 0 460 460">${[1/3,2/3,1].map((f)=>`<polygon fill="none" stroke="#2b3d68" stroke-width="3" points="${ORDER.map((_,i)=>{const t=-Math.PI/2+2*Math.PI*i/8;return (230+190*f*Math.cos(t))+','+(230+190*f*Math.sin(t));}).join(' ')}"/>`).join('')}<polygon fill="rgba(143,176,255,.28)" stroke="#8fb0ff" stroke-width="6" stroke-linejoin="round" points="${[0.35,0.4,0.55,0.3,0.95,0.8,0.8,0.28].map((v,i)=>{const t=-Math.PI/2+2*Math.PI*i/8;return (230+190*v*Math.cos(t))+','+(230+190*v*Math.sin(t));}).join(' ')}"/></svg></div>`],
+  ['', `<div class="series">先看一个例子</div><h2 style="margin-top:20px">这样的雷达图，<br>你怎么读？</h2>
+    <div style="display:flex;justify-content:center;margin-top:20px">${radarSvg(900)}</div>
+    <div class="note" style="text-align:center;margin-top:-10px">示例数据，仅用于演示读图方法，不代表任何真实个人</div>`],
+  tip(1, '看最高的 1–2 项', '最高的一两项，是你做取舍时的<span class="hl">"底线需求"</span>。<br><br>在这张例子里，创业/创造、服务/奉献、挑战三项明显更高——这个人很可能不愿意长期做<span class="hl">没有新意、也看不到意义</span>的重复工作。', `<div class="card" style="margin-top:50px"><div class="lbl">怎么用</div><div class="txt" style="font-size:36px">选工作时，先问：这件事能不能满足我最高的那一两项？</div></div>`),
+  tip(2, '看最低的项', '低分<span class="hl">不是缺点</span>，只是说明这件事对你<span class="hl">不是决定因素</span>。<br><br>例子里"安全/稳定""生活方式"偏低：并不代表不需要，而是在取舍时，它们不是最先考虑的。', `<div class="card" style="margin-top:50px"><div class="lbl warn">留意一点</div><div class="txt" style="font-size:36px">低分项也别完全忽略：它可能是你容易被忽视、但会在某个阶段冒出来的需求。</div></div>`),
+  tip(3, '看差距和并列', '前几名<span class="hl">分数接近</span>：说明几件事都重要，要找能<span class="hl">同时满足</span>的环境。<br><br>某一项<span class="hl">一骑绝尘</span>：取舍时以它为准，其他可以让步。', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:50px"><div class="card"><div class="lbl">前几名接近</div><div class="txt">找"都能兼顾"的方案，比如做新业务又有明确意义</div></div><div class="card"><div class="lbl">一项遥遥领先</div><div class="txt">别为了别的因素，放弃它</div></div></div>`),
+  ['', `<div class="series">最后提醒</div><h2 style="margin-top:20px">分数是倾向，<br>不是定论</h2>
+    <div class="big" style="margin-top:50px">你的状态、阶段、处境都会变，<br>半年后再看一次，<br><span class="hl">结果可能不一样</span>，这很正常。</div>
+    <div class="card" style="margin-top:56px;font-size:42px;line-height:1.7">聊聊：你的雷达图是什么形状？<br>不用报分数，说形状就行 👇</div>
+    <div class="note" style="margin-top:40px">职业锚仅作为自我认知参考，不构成任何决策依据。</div>`],
+];
+
+(async () => {
+  const b = await chromium.launch(); const p = await (await b.newContext({ viewport: { width: 1080, height: 1440 }, deviceScaleFactor: 1 })).newPage();
+  const sets = [['note1', note1, S1], ['note2', note2, S2], ['note3', note3, S3]];
+  for (const [name, pages, series] of sets) {
+    for (let i = 0; i < pages.length; i++) {
+      const [cls, inner] = pages[i];
+      await p.setContent(wrap(cls, inner, String(i + 1).padStart(2, '0'), String(pages.length).padStart(2, '0'), series));
+      await p.evaluate(() => { // 非封面页：把内容尽量放大，填满画面（保持版心宽度不变）
+        const el = document.getElementById('fit'); if (!el) return;
+        const avail = 1440 - 84 - 150; let lo = 1, hi = 1.5;
+        for (let k = 0; k < 14; k++) { const m = (lo + hi) / 2; el.style.zoom = m; el.style.width = 912 / m + 'px'; if (el.getBoundingClientRect().height <= avail) lo = m; else hi = m; }
+        el.style.zoom = lo; el.style.width = 912 / lo + 'px';
+      });
+      await p.waitForTimeout(80);
+      await p.screenshot({ path: `${OUT}/${name}-${String(i + 1).padStart(2, '0')}.png` });
+    }
+    console.log(name, pages.length, '张');
+  }
+  await b.close();
+})();

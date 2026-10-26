@@ -3,6 +3,8 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。题库或解读文案变更也要记录在这里。
 
 ## [Unreleased]
+### 文档
+- 小红书前 3 篇笔记成品：正文、标签、置顶评论、19 张 1080×1440 图片、发布前检查与评论回复库，位于 `docs/product/launch/xhs-notes/`；发布仍待 #38 核对平台规则（#29）
 
 ## [1.4.0] - 2026-10-26
 ### 文档
