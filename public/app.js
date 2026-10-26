@@ -158,7 +158,9 @@
     if (S.att.status === 'submitted') return renderResult(S.att);
     S.page = firstUnanswered(); S.picks = []; renderQuiz();
   }
-  const pageSize = () => Math.max(1, Number(S.att.config.pageSize) || 5);
+  // 每页题数由后台设置决定；网址加 ?ps=1/2/5/10/20 可以只在自己的浏览器里预览别的分页方式
+  const PS_PREVIEW = (() => { const n = Number(new URLSearchParams(location.search).get('ps')); return [1, 2, 5, 10, 20].includes(n) ? n : 0; })();
+  const pageSize = () => PS_PREVIEW || Math.max(1, Number(S.att.config.pageSize) || 5);
   function firstUnanswered() {
     const i = S.att.questions.findIndex((q) => !S.att.answers[q.id]);
     return i < 0 ? Math.floor((S.att.questions.length - 1) / pageSize()) : Math.floor(i / pageSize());

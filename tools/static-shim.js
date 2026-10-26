@@ -1,7 +1,7 @@
 'use strict';
 // 纯前端版本的"假后端"：在浏览器内实现 /api/*，数据存在 localStorage。
 // 依赖构建时注入的 QUESTIONS、ANCHORS、ANCHOR_ORDER、shuffleIds、score。
-const CFG = { top3Bonus: true, pageSize: 10 };
+const CFG = { top3Bonus: true, pageSize: 5 };
 const DB_KEY='ca_preview_db_v1';
 let mem={users:{},nextId:1};
 const load=()=>{try{const s=localStorage.getItem(DB_KEY);if(s)return JSON.parse(s)}catch(e){}return mem};

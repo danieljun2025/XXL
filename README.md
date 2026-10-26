@@ -18,7 +18,7 @@ npm test
 ## 机制
 - 身份：姓名 + 邮箱 + 自设查看密钥（scrypt 加盐哈希）。回访需「邮箱 + 密钥」；连续错 5 次锁 15 分钟；忘记密钥由后台重置。
 - 每次作答题序随机（种子入库），每题自动保存草稿，可断点续答；计分在服务端完成。
-- 题目与解读在 `server/data/questions.json`、`anchors.json`，参数在 `config.json`（`top3Bonus`、`pageSize` 等）。
+- 题目与解读在 `server/data/questions.json`、`anchors.json`，参数在 `config.json`（`top3Bonus` 等；每页题数默认值也在这里，运行时可在后台「答题设置」调整）。
 - 纯静态版（GitHub Pages）见 `career-anchor/`，由 `npm run build:static` 生成；首页 `index.html` 是介绍页（按钮指向 anchor.matchgamers.com 的完整版），`career-anchor/` 为不联网的静态备用版。
 
 ## 已知取舍

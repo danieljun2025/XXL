@@ -24,14 +24,15 @@
     try {
       cfg = cfg || await (await fetch('/api/config')).json();
       const ls = await api('GET', `/api/admin/attempts?page=${page}&q=${encodeURIComponent(q)}&status=${status}`);
-      draw(ls);
+      draw(ls, await api('GET', '/api/admin/settings'));
     } catch (e) { login(e.message); }
   }
-  function draw(ls) {
+  function draw(ls, settings) {
     const A = cfg.anchors, pages = Math.max(1, Math.ceil(ls.total / ls.size));
     app.innerHTML = `<div class="card"><h1>管理后台</h1><p class="muted">共 ${ls.total} 条记录。</p><div class="row"><a class="btnlink" href="/report.html">查看统计报表 →</a> <a class="btnlink" href="/codes.html">兑换码管理 →</a> <a class="btnlink" href="/teams.html">团队管理 →</a></div>
       <div class="row"><button type="button" class="ghost" id="bk">下载数据库备份</button><button type="button" class="ghost" id="pg">清理旧数据…</button><span id="mt" class="muted"></span></div>
-      <p class="muted small">建议每周下载一次备份并保存在自己的电脑或网盘；备份里的查看密钥只有哈希，不含登录会话。</p></div>
+      <p class="muted small">建议每周下载一次备份并保存在自己的电脑或网盘；备份里的查看密钥只有哈希，不含登录会话。</p>
+      <div class="row" style="align-items:center"><label for="ps" style="margin:0">答题设置：每页题数</label><select id="ps" style="padding:8px 10px;border-radius:10px;background:var(--bg);color:var(--text);border:1px solid var(--line)">${settings.allowed.map((n) => `<option value="${n}"${n === settings.pageSize ? ' selected' : ''}>${n} 题</option>`).join('')}</select><button type="button" class="ghost" id="pss">保存</button><span id="psm" class="muted small">当前 ${settings.pageSize} 题/页（默认 ${settings.defaultPageSize}）。改后立即生效，答到一半的人下次进入按新设置分页。预览：在测试网址后加 <span class="mono">?ps=1</span> 等。</span></div></div>
       <div class="card"><form id="s" class="row" style="margin:0"><input id="q" type="text" placeholder="搜索姓名或邮箱" value="${esc(q)}" style="max-width:260px">
         <select id="st" style="padding:10px;border-radius:10px"><option value="">全部状态</option><option value="submitted" ${status === 'submitted' ? 'selected' : ''}>已提交</option><option value="draft" ${status === 'draft' ? 'selected' : ''}>进行中</option></select>
         <button>搜索</button><button type="button" class="ghost" id="csv">导出 CSV</button><button type="button" class="ghost" id="out">退出</button></form>
@@ -45,6 +46,10 @@
     document.getElementById('pv').onclick = () => { page--; load(); };
     document.getElementById('nx').onclick = () => { page++; load(); };
     document.getElementById('out').onclick = () => { try { sessionStorage.removeItem('ca_admin'); } catch (e) { /* 忽略 */ } pw = ''; login(); };
+    document.getElementById('pss').onclick = async () => {
+      const m = document.getElementById('psm');
+      try { const r = await api('POST', '/api/admin/settings', { pageSize: Number(document.getElementById('ps').value) }); m.textContent = `已保存：${r.pageSize} 题/页，立即生效`; } catch (er) { m.textContent = er.message; }
+    };
     const mt = document.getElementById('mt');
     document.getElementById('bk').onclick = async () => {
       mt.textContent = '正在生成备份…';

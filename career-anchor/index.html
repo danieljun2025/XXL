@@ -295,7 +295,7 @@ function score(questions, answers, picks = []) {
 'use strict';
 // 纯前端版本的"假后端"：在浏览器内实现 /api/*，数据存在 localStorage。
 // 依赖构建时注入的 QUESTIONS、ANCHORS、ANCHOR_ORDER、shuffleIds、score。
-const CFG = { top3Bonus: true, pageSize: 10 };
+const CFG = { top3Bonus: true, pageSize: 5 };
 const DB_KEY='ca_preview_db_v1';
 let mem={users:{},nextId:1};
 const load=()=>{try{const s=localStorage.getItem(DB_KEY);if(s)return JSON.parse(s)}catch(e){}return mem};
@@ -516,7 +516,9 @@ window.CA_STATIC = true;
     if (S.att.status === 'submitted') return renderResult(S.att);
     S.page = firstUnanswered(); S.picks = []; renderQuiz();
   }
-  const pageSize = () => Math.max(1, Number(S.att.config.pageSize) || 5);
+  // 每页题数由后台设置决定；网址加 ?ps=1/2/5/10/20 可以只在自己的浏览器里预览别的分页方式
+  const PS_PREVIEW = (() => { const n = Number(new URLSearchParams(location.search).get('ps')); return [1, 2, 5, 10, 20].includes(n) ? n : 0; })();
+  const pageSize = () => PS_PREVIEW || Math.max(1, Number(S.att.config.pageSize) || 5);
   function firstUnanswered() {
     const i = S.att.questions.findIndex((q) => !S.att.answers[q.id]);
     return i < 0 ? Math.floor((S.att.questions.length - 1) / pageSize()) : Math.floor(i / pageSize());
