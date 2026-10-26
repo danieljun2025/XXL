@@ -19,12 +19,29 @@
   // 隐私说明与服务说明放在完整版站点上；静态备用版用绝对地址
   const LEGAL = window.CA_STATIC ? 'https://anchor.matchgamers.com' : '';
   const legalNote = (verb) => `<p class="muted small" style="margin-top:14px">${verb}即表示你已阅读并同意<a href="${LEGAL}/privacy.html" target="_blank" rel="noopener">隐私说明</a>和<a href="${LEGAL}/terms.html" target="_blank" rel="noopener">服务说明与退款规则</a>。</p>`;
-  const view = (html) => { app.innerHTML = html; window.scrollTo(0, 0); const h = app.querySelector('h1,h2'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } };
+  // withAside：答题前的页面在右侧（手机在下方）显示职业锚介绍边栏
+  const view = (html, withAside) => {
+    app.classList.toggle('wide', !!withAside);
+    app.innerHTML = withAside ? `<div class="layout"><div class="main">${html}</div>${asideHtml()}</div>` : html;
+    window.scrollTo(0, 0); const h = app.querySelector('h1,h2'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
+  };
+  const viewA = (html) => view(html, true);
+  function asideHtml() {
+    const A = S.cfg && S.cfg.anchors, order = S.cfg && S.cfg.order;
+    if (!A || !order) return '';
+    return `<aside class="side" aria-label="职业锚介绍">
+      <h2>什么是职业锚？</h2>
+      <p>职业锚是你在职业选择中<b>最不愿意放弃的那个核心动机</b>。这个概念由麻省理工学院的埃德加·沙因（Edgar Schein）提出，用来帮助人们看清自己真正看重什么。</p>
+      <p class="muted small">一共 8 种，通常有一两种最突出。没有好坏之分，只有适合与否。点开看看每一种：</p>
+      <div class="alist">${order.map((c) => `<details><summary><span class="acode">${esc(c)}</span>${esc(A[c].name)}</summary><p>${esc(A[c].definition)}</p><p class="muted small"><b>核心动机：</b>${esc(A[c].motivation)}</p></details>`).join('')}</div>
+      <p class="muted small">本测评用 40 道题估算你在这 8 个维度上的倾向，仅作自我认知参考，不构成录用、诊断或其他决策依据。</p>
+    </aside>`;
+  }
 
   // ---------- 入口 ----------
   function renderEnter(msg) {
     if (window.CA_STATIC) {
-      view(`<div class="card"><h1>职业锚测试</h1>
+      viewA(`<div class="card"><h1>职业锚测试</h1>
         <p class="muted">共 40 题，约 10 分钟。完成后立即生成你的职业锚报告，报告上会显示你的名字，并可保存为图片。</p>
         <form id="f" autocomplete="off"><label for="name">你的名字</label><input id="name" type="text" maxlength="30" required>
         <div class="err" id="err" role="alert">${esc(msg || '')}</div>
@@ -43,7 +60,7 @@
     const isNew = S.mode === 'new';
     const needCode = isNew && !!(S.cfg && S.cfg.showCodeField);
     const codeRequired = !!(S.cfg && S.cfg.requireCode);
-    view(`<div class="card">
+    viewA(`<div class="card">
       <h1>职业锚测试</h1>
       <p class="muted">共 40 题，约 10 分钟。完成后立即获得你的职业锚报告，结果会保存，之后可凭「邮箱 + 查看密钥」再次查看。</p>
       <div class="tabs" role="group" aria-label="身份">
@@ -87,7 +104,7 @@
 
   function renderHome() {
     const hasDraft = S.attempts.some((a) => a.status === 'draft');
-    view(`<div class="card"><h1>你好，${esc(S.name)}</h1><p class="muted">你的测试记录：</p>
+    viewA(`<div class="card"><h1>你好，${esc(S.name)}</h1><p class="muted">你的测试记录：</p>
       <ul class="hist">${S.attempts.map((a) => `<li><span>${a.status === 'submitted' ? `已完成 · ${fmt(a.submittedAt)} ${(a.primary || []).map((c) => `<span class="badge">${esc(S.cfg.anchors[c].name)}</span>`).join('')}` : `未完成 · 开始于 ${fmt(a.startedAt)}`}</span>
         <button class="ghost" data-open="${a.id}">${a.status === 'submitted' ? '查看结果' : '继续作答'}</button></li>`).join('')}</ul>
       <div class="row">${hasDraft ? '' : '<button id="again">重新测试</button>'}<button class="ghost" id="out">退出</button></div></div>`);
@@ -125,7 +142,7 @@
 
   function renderRedeem(msg) {
     const optional = !(S.cfg && S.cfg.requireCode);
-    view(`<div class="card"><h1>${optional ? '团队码' : '输入兑换码'}</h1>
+    viewA(`<div class="card"><h1>${optional ? '团队码' : '输入兑换码'}</h1>
       <p class="muted">你好，${esc(S.name)}。${optional ? '如果是团队或班级组织的测试，请填写负责人给你的团队码；没有的话可以直接开始。' : '开始一次新的测试需要一个兑换码，每个码只能用一次。已经开始的测试和历史结果不需要兑换码。'}</p>
       <form id="f" autocomplete="off"><label for="code">${optional ? '团队码（可不填）' : '兑换码'}</label>
         <input id="code" type="text" maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="例如 AB3K-7MQ2" ${optional ? '' : 'required'}>

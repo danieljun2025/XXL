@@ -72,3 +72,22 @@ table{width:100%;border-collapse:collapse}th,td{padding:8px 6px;border-bottom:1p
 .sbox{border:1px solid var(--line);border-radius:12px;padding:12px 14px}.sbox p{margin:.3em 0 0;font-size:.92rem;color:var(--muted)}
 .sh{display:flex;justify-content:space-between;align-items:baseline}.sh span{font-weight:700;color:var(--brand);font-variant-numeric:tabular-nums}
 h1:focus,h2:focus{outline:none}
+
+/* ---- 职业锚介绍边栏 ---- */
+.wrap.wide{max-width:1040px}
+.layout{display:grid;grid-template-columns:minmax(0,560px) minmax(0,340px);gap:20px;justify-content:center;align-items:start}
+.layout .main .card:first-child{margin-top:0}
+.side{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;position:sticky;top:16px}
+.side h2{margin:0 0 8px}.side p{margin:.5em 0}
+.alist{margin:10px 0 12px;border-top:1px solid var(--line)}
+.alist details{border-bottom:1px solid var(--line);padding:2px 0}
+.alist summary{cursor:pointer;padding:8px 0;display:flex;align-items:center;gap:10px;font-weight:600;list-style:none}
+.alist summary::-webkit-details-marker{display:none}
+.alist summary::after{content:"+";margin-left:auto;color:var(--muted);font-weight:400}
+.alist details[open] summary::after{content:"–"}
+.alist summary:focus-visible{outline:3px solid var(--brand);outline-offset:2px;border-radius:6px}
+.acode{flex:none;width:2.2em;text-align:center;background:var(--sel);color:var(--brand);border-radius:6px;font-size:.75rem;padding:2px 0}
+.alist details p{margin:.2em 0 .5em;font-size:.92rem}
+@media (max-width:980px){.layout{display:block}.side{position:static;margin-top:14px}}
+@media print{.side{display:none}}
+p.muted a,.side a{color:var(--brand)}
