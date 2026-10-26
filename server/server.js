@@ -93,6 +93,13 @@ function createApp(opts = {}) {
     aSubmit: db.prepare("UPDATE attempts SET status='submitted', answers=?, top3=?, scores=?, primary_anchors=?, submitted_at=? WHERE id=? AND status='draft'"),
   };
 
+  // 可在后台调整的设置，存在 meta 表里；没设置过就用 config.json 的默认值
+  const PAGE_SIZES = [1, 2, 5, 10, 20];
+  const getPageSize = () => {
+    const row = db.prepare("SELECT v FROM meta WHERE k='setting:pageSize'").get();
+    const n = row ? Number(row.v) : NaN;
+    return PAGE_SIZES.includes(n) ? n : config.pageSize;
+  };
   const ipHash = (ip) => sha256(db.ipSalt + ip).slice(0, 24);
   const clientIp = (req) => (trustProxy && req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : req.socket.remoteAddress) || '0';
 
@@ -151,7 +158,7 @@ function createApp(opts = {}) {
 
   function attemptView(r, participant) {
     const order = JSON.parse(r.question_order);
-    const view = { id: r.id, status: r.status, name: participant.name, reportNo: reportNo(r), config: { top3Bonus: !!config.top3Bonus, pageSize: config.pageSize } };
+    const view = { id: r.id, status: r.status, name: participant.name, reportNo: reportNo(r), config: { top3Bonus: !!config.top3Bonus, pageSize: getPageSize() } };
     const tm = r.team_id ? q.tById.get(r.team_id) : null;
     if (tm) view.team = tm.name;
     if (r.status === 'draft') {
@@ -300,7 +307,7 @@ function createApp(opts = {}) {
     const method = req.method;
     const ip = clientIp(req);
 
-    if (method === 'GET' && p === '/api/config') return send(res, 200, { top3Bonus: !!config.top3Bonus, pageSize: config.pageSize, requireCode: !!config.requireCode, showCodeField: !!config.requireCode || q.tCount.get().c > 0, anchors, order: ANCHOR_ORDER });
+    if (method === 'GET' && p === '/api/config') return send(res, 200, { top3Bonus: !!config.top3Bonus, pageSize: getPageSize(), requireCode: !!config.requireCode, showCodeField: !!config.requireCode || q.tCount.get().c > 0, anchors, order: ANCHOR_ORDER });
 
     if (method === 'POST' && p === '/api/enter') {
       if (!limit('enter:' + ip, config.enterPerMin || 30, 60_000)) throw new HttpError(429, '请求过于频繁，请稍后再试');
@@ -476,6 +483,15 @@ function createApp(opts = {}) {
         const like = '%' + kw.replace(/[\\%_]/g, '\\$&') + '%';
         const rows = db.prepare(`SELECT p.id,p.name,p.email,p.created_at,(SELECT COUNT(*) FROM attempts a WHERE a.participant_id=p.id) attempts FROM participants p ${kw ? "WHERE lower(p.name) LIKE ? ESCAPE '\\' OR p.email_norm LIKE ? ESCAPE '\\'" : ''} ORDER BY p.id DESC LIMIT 100`).all(...(kw ? [like, like] : []));
         return send(res, 200, { rows: rows.map((r) => ({ id: r.id, name: r.name, email: r.email, attempts: r.attempts, createdAt: r.created_at })) });
+      }
+      // 答题设置：每页题数
+      if (p === '/api/admin/settings' && method === 'GET') return send(res, 200, { pageSize: getPageSize(), defaultPageSize: config.pageSize, allowed: PAGE_SIZES });
+      if (p === '/api/admin/settings' && method === 'POST') {
+        const body = await readJson(req);
+        const n = Number(body.pageSize);
+        if (!PAGE_SIZES.includes(n)) throw new HttpError(400, `每页题数只能是 ${PAGE_SIZES.join('、')}`);
+        db.prepare("INSERT INTO meta(k,v) VALUES('setting:pageSize',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(String(n));
+        return send(res, 200, { ok: true, pageSize: n });
       }
       // 数据库备份：服务端生成一致性副本（VACUUM INTO），去掉登录会话后下载；备份里密钥只有哈希
       if (method === 'GET' && p === '/api/admin/backup') {

@@ -67,6 +67,7 @@
 | `REQUIRE_CODE` | 关 | `1` 时开始新测试需要兑换码（启用清单见 [launch/enable-redeem-codes.md](launch/enable-redeem-codes.md)） | 删除或改 `0` |
 | `TRUST_PROXY` | 镜像内为 `1` | 反向代理后取真实 IP | — |
 | `DB_PATH` | `/data/career-anchor.db` | 数据库位置 | — |
+| 每页题数（后台「答题设置」） | 5 | 可选 1/2/5/10/20，改后立即生效；预览用网址 `?ps=` | 在后台改回 5 |
 | `teamMinGroup`（配置文件） | 3 | 团队汇总最少完成人数 | 改配置文件并发布 |
 
 新增开关要同步更新此表。
