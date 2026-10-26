@@ -36,7 +36,7 @@
   function draw(d) {
     const s = d.summary, pages = Math.max(1, Math.ceil(d.total / d.size));
     const shared = kind === 'shared';
-    app.innerHTML = `<div class="crumb"><a href="/admin.html">← 返回管理后台</a></div><h1>兑换码管理</h1>
+    app.innerHTML = `<h1>兑换码管理</h1>
       <section class="panel"><div class="kpis"><div><b>${s.total}</b>已生成</div><div><b>${s.active}</b>当前可用</div><div><b>${s.used}</b>已用完</div><div><b>${s.expired}</b>已过期</div><div><b>${s.voided}</b>已作废</div></div>
         <p class="muted" style="margin:10px 0 0">需要在服务器环境变量里设置 <span class="mono">REQUIRE_CODE=1</span>，答题时才会要求输入兑换码。</p></section>
       <section class="panel"><h2>生成兑换码</h2>

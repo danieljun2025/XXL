@@ -46,6 +46,17 @@ test('备份下载：需要口令；返回有效的 SQLite 文件，数据完整
   db.close();
 });
 
+test('下载备份后：概览的备份提醒变为正常，设置里显示上次备份时间', async () => {
+  const todo = async () => (await call('GET', '/api/admin/overview', null, 'admin-pass')).body.todos.find((t) => t.id === 'backup');
+  // 上一个测试已经下载过一次备份；再下载一次，时间戳会刷新
+  assert.equal((await call('GET', '/api/admin/backup', null, 'admin-pass')).status, 200);
+  const t = await todo();
+  assert.equal(t.level, 'ok');
+  assert.match(t.text, /今天/);
+  const after = (await call('GET', '/api/admin/settings', null, 'admin-pass')).body.groups.flatMap((g) => g.items).find((i) => i.key === 'lastBackup').value;
+  assert.doesNotMatch(after, /还没有/);
+});
+
 test('恢复演练：用备份文件启动新服务，原用户凭邮箱和密钥登录，历史结果可读', async () => {
   const r = await call('GET', '/api/admin/backup', null, 'admin-pass');
   const restored = path.join(dir, 'restored.db');
@@ -70,6 +81,7 @@ test('清理旧数据：先预览后执行，只删超过期限无活动的用�
   live.prepare('UPDATE attempts SET started_at=?, submitted_at=? WHERE participant_id=?').run(old, old, id);
   live.close();
   assert.equal((await call('GET', '/api/admin/purge-preview?months=12')).status, 401);
+  assert.match((await call('GET', '/api/admin/overview', null, 'admin-pass')).body.todos.find((t) => t.id === 'purge').text, /1 位用户已超过 12 个月/);
   assert.equal((await call('GET', '/api/admin/purge-preview?months=0', null, 'admin-pass')).status, 400);
   const pv = await call('GET', '/api/admin/purge-preview?months=12', null, 'admin-pass');
   assert.equal(pv.body.count, 1);
@@ -79,4 +91,5 @@ test('清理旧数据：先预览后执行，只删超过期限无活动的用�
   const stats = await call('GET', '/api/admin/stats', null, 'admin-pass');
   assert.equal(stats.body.participants, 1);
   assert.equal((await call('GET', '/api/admin/purge-preview?months=12', null, 'admin-pass')).body.count, 0);
+  assert.equal((await call('GET', '/api/admin/overview', null, 'admin-pass')).body.todos.some((t) => t.id === 'purge'), false);
 });

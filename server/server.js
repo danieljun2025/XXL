@@ -93,13 +93,39 @@ function createApp(opts = {}) {
     aSubmit: db.prepare("UPDATE attempts SET status='submitted', answers=?, top3=?, scores=?, primary_anchors=?, submitted_at=? WHERE id=? AND status='draft'"),
   };
 
-  // 可在后台调整的设置，存在 meta 表里；没设置过就用 config.json 的默认值
-  const PAGE_SIZES = [1, 2, 5, 10, 20];
-  const getPageSize = () => {
-    const row = db.prepare("SELECT v FROM meta WHERE k='setting:pageSize'").get();
-    const n = row ? Number(row.v) : NaN;
-    return PAGE_SIZES.includes(n) ? n : config.pageSize;
+  // ---------- 设置注册表 ----------
+  // 新增一个设置 = 在 baseSettings 里登记一条：后台「设置」页会按 group 自动显示，值存在 meta 表（键 setting:<key>），没设置过用 default。
+  // type: select（下拉，值必须在 options 里）/ readonly（只读状态）/ action（带按钮的操作，由前端按 action 名处理）
+  const pkgVersion = require('../package.json').version;
+  const num = (n, unit) => ({ value: n, label: `${n} ${unit}` });
+  const dbFileSize = () => { try { return db.prepare('PRAGMA page_count').get().page_count * db.prepare('PRAGMA page_size').get().page_size; } catch { return 0; } };
+  const fmtSize = (b) => (b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB');
+  const baseSettings = [
+    { key: 'pageSize', group: 'quiz', type: 'select', label: '每页题数', help: '答题时每页显示几道题。改后立即生效；答到一半的人下次进入按新设置分页。预览：在测试网址后加 ?ps=1 等，只影响自己的浏览器。', options: [1, 2, 5, 10, 20].map((n) => num(n, '题')), default: config.pageSize },
+    { key: 'requireCode', group: 'access', type: 'readonly', label: '兑换码', help: '由环境变量 REQUIRE_CODE 控制，在 Render 的 Environment 里修改。', value: () => (config.requireCode ? '已启用（REQUIRE_CODE=1）' : '未启用（所有人可直接开始测试）') },
+    { key: 'teamMinGroup', group: 'data', type: 'select', label: '团队汇总最少完成人数', help: '团队完成人数少于这个数时，团队负责人看不到汇总。隐私说明承诺不少于 3 人，所以最低是 3。', options: [3, 5, 10].map((n) => num(n, '人')), default: Number(config.teamMinGroup) || 3 },
+    { key: 'backup', group: 'data', type: 'action', action: 'backup', label: '数据库备份', help: '下载一份完整的数据库副本（不含登录会话，查看密钥只有哈希）。建议每周一次，保存在自己的电脑或网盘。' },
+    { key: 'purge', group: 'data', type: 'action', action: 'purge', label: '清理旧数据', help: '预览并删除长期无活动的用户及其全部测试记录（隐私说明承诺最长保存 12 个月）。删除前请先下载备份。' },
+    { key: 'version', group: 'system', type: 'readonly', label: '版本', value: () => 'v' + pkgVersion },
+    { key: 'dbSize', group: 'system', type: 'readonly', label: '数据库大小', value: () => fmtSize(dbFileSize()) },
+    { key: 'lastBackup', group: 'system', type: 'readonly', label: '上次下载备份', value: () => { const r = db.prepare("SELECT v FROM meta WHERE k='last_backup_at'").get(); return r ? new Date(Number(r.v)).toLocaleString('zh-CN', { hour12: false }) : '还没有下载过'; } },
+    { key: 'runtime', group: 'system', type: 'readonly', label: '运行环境', value: () => `Node ${process.versions.node} · 已运行 ${Math.floor(process.uptime() / 3600)} 小时` },
+    ...(opts.extraSettings || []),
+  ];
+  const SETTING_GROUPS = [
+    { id: 'quiz', name: '答题体验', desc: '影响答题者看到的流程。改后立即生效。' },
+    { id: 'access', name: '兑换码与访问', desc: '谁能进入、怎样发放。具体到某个码或某个团队的设置，在「兑换码」「团队」标签里。' },
+    { id: 'data', name: '数据与隐私', desc: '数据保存、删除、备份和隐私承诺。' },
+    { id: 'system', name: '系统信息', desc: '只读的运行状态。' },
+  ];
+  const selectDef = (k) => baseSettings.find((d) => d.key === k && d.type === 'select');
+  const getSetting = (k) => {
+    const d = selectDef(k);
+    const row = db.prepare('SELECT v FROM meta WHERE k=?').get('setting:' + k);
+    const hit = row && d.options.find((o) => String(o.value) === row.v);
+    return hit ? hit.value : d.default;
   };
+  const getPageSize = () => getSetting('pageSize');
   const ipHash = (ip) => sha256(db.ipSalt + ip).slice(0, 24);
   const clientIp = (req) => (trustProxy && req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : req.socket.remoteAddress) || '0';
 
@@ -418,7 +444,7 @@ function createApp(opts = {}) {
       }
       const tz = Math.max(-840, Math.min(840, Number(body.tz) || 0));
       const rep = buildReport(team.id, tz);
-      const minGroup = Number(config.teamMinGroup) || 0;
+      const minGroup = Number(getSetting('teamMinGroup')) || 0;
       const insufficient = rep.submitted < minGroup;
       const out = { team: { name: team.name, shareNames: !!team.share_names, closed: !!team.closed }, minGroup, insufficient };
       if (insufficient) Object.assign(out, { participants: rep.participants, submitted: rep.submitted, drafts: rep.drafts });
@@ -484,14 +510,35 @@ function createApp(opts = {}) {
         const rows = db.prepare(`SELECT p.id,p.name,p.email,p.created_at,(SELECT COUNT(*) FROM attempts a WHERE a.participant_id=p.id) attempts FROM participants p ${kw ? "WHERE lower(p.name) LIKE ? ESCAPE '\\' OR p.email_norm LIKE ? ESCAPE '\\'" : ''} ORDER BY p.id DESC LIMIT 100`).all(...(kw ? [like, like] : []));
         return send(res, 200, { rows: rows.map((r) => ({ id: r.id, name: r.name, email: r.email, attempts: r.attempts, createdAt: r.created_at })) });
       }
-      // 答题设置：每页题数
-      if (p === '/api/admin/settings' && method === 'GET') return send(res, 200, { pageSize: getPageSize(), defaultPageSize: config.pageSize, allowed: PAGE_SIZES });
+      // 设置：按注册表通用读写
+      if (p === '/api/admin/settings' && method === 'GET') {
+        const items = (g) => baseSettings.filter((d) => d.group === g).map((d) => {
+          const o = { key: d.key, type: d.type, label: d.label, help: d.help || '' };
+          if (d.type === 'select') Object.assign(o, { options: d.options, default: d.default, value: getSetting(d.key) });
+          if (d.type === 'readonly') o.value = d.value();
+          if (d.type === 'action') o.action = d.action;
+          return o;
+        });
+        return send(res, 200, { groups: SETTING_GROUPS.map((g) => ({ ...g, items: items(g.id) })) });
+      }
       if (p === '/api/admin/settings' && method === 'POST') {
         const body = await readJson(req);
-        const n = Number(body.pageSize);
-        if (!PAGE_SIZES.includes(n)) throw new HttpError(400, `每页题数只能是 ${PAGE_SIZES.join('、')}`);
-        db.prepare("INSERT INTO meta(k,v) VALUES('setting:pageSize',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(String(n));
-        return send(res, 200, { ok: true, pageSize: n });
+        const values = body.values;
+        if (!values || typeof values !== 'object' || Array.isArray(values) || !Object.keys(values).length) throw new HttpError(400, '没有要保存的设置');
+        for (const [k, v] of Object.entries(values)) { // 先全部校验，再一起保存
+          const d = selectDef(k);
+          if (!d) throw new HttpError(400, `未知或不可修改的设置：${k}`);
+          if (v !== null && !d.options.some((o) => o.value === v)) throw new HttpError(400, `「${d.label}」只能是：${d.options.map((o) => o.label).join('、')}`);
+        }
+        db.exec('BEGIN IMMEDIATE');
+        try {
+          for (const [k, v] of Object.entries(values)) {
+            if (v === null) db.prepare('DELETE FROM meta WHERE k=?').run('setting:' + k); // 恢复默认
+            else db.prepare('INSERT INTO meta(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').run('setting:' + k, String(v));
+          }
+          db.exec('COMMIT');
+        } catch (e) { db.exec('ROLLBACK'); throw e; }
+        return send(res, 200, { ok: true, applied: Object.keys(values) });
       }
       // 数据库备份：服务端生成一致性副本（VACUUM INTO），去掉登录会话后下载；备份里密钥只有哈希
       if (method === 'GET' && p === '/api/admin/backup') {
@@ -504,6 +551,7 @@ function createApp(opts = {}) {
           copy.exec('VACUUM');
           copy.close();
           const buf = fs.readFileSync(tmp);
+          db.prepare("INSERT INTO meta(k,v) VALUES('last_backup_at',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(String(now()));
           const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
           return send(res, 200, buf, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="career-anchor-${stamp}.db"` });
         } finally { for (const f of [tmp, tmp + '-wal', tmp + '-shm']) fs.rmSync(f, { force: true }); }
@@ -598,6 +646,27 @@ function createApp(opts = {}) {
         expired: `c.voided=0 AND c.expires_at IS NOT NULL AND c.expires_at<=${stNow} AND NOT (c.kind='single' AND c.used_at IS NOT NULL)`,
       };
       COND.active = `c.voided=0 AND (c.expires_at IS NULL OR c.expires_at>${stNow}) AND NOT (${COND.used})`;
+      // 概览：关键数字 + 待办提醒
+      if (p === '/api/admin/overview' && method === 'GET') {
+        const rep = buildReport(null, 0);
+        const day = 86400_000;
+        const todos = [];
+        const lb = db.prepare("SELECT v FROM meta WHERE k='last_backup_at'").get();
+        const age = lb ? Math.floor((now() - Number(lb.v)) / day) : null;
+        if (age === null) todos.push({ id: 'backup', level: 'warn', text: '还没有下载过数据库备份', action: { label: '去备份', href: '/settings.html#data' } });
+        else if (age > 7) todos.push({ id: 'backup', level: 'warn', text: `上次下载备份是 ${age} 天前，建议每周一次`, action: { label: '去备份', href: '/settings.html#data' } });
+        else todos.push({ id: 'backup', level: 'ok', text: age === 0 ? '今天已下载过数据库备份' : `最近一次备份：${age} 天前` });
+        const stale = db.prepare(staleSql).all(now() - 12 * 30 * day).length;
+        if (stale > 0) todos.push({ id: 'purge', level: 'warn', text: `${stale} 位用户已超过 12 个月无活动，可以清理（隐私说明承诺最长保存 12 个月）`, action: { label: '去清理', href: '/settings.html#data' } });
+        const activeCodes = db.prepare(`SELECT COUNT(*) c FROM codes c WHERE ${COND.active}`).get().c;
+        const openTeams = q.tCount.get().c;
+        if (config.requireCode) {
+          if (activeCodes === 0) todos.push({ id: 'codes', level: 'warn', text: '兑换码已启用，但现在没有可用的兑换码，新用户进不来', action: { label: '去生成', href: '/codes.html' } });
+          else todos.push({ id: 'codes', level: 'ok', text: `兑换码已启用；当前可用 ${activeCodes} 个`, action: { label: '查看', href: '/codes.html' } });
+        } else todos.push({ id: 'codes', level: 'info', text: '兑换码未启用：所有人可直接开始测试', action: { label: '启用说明', href: '/settings.html#access' } });
+        todos.push({ id: 'service', level: 'ok', text: '服务运行正常' });
+        return send(res, 200, { kpis: { participants: rep.participants, submitted: rep.submitted, drafts: rep.drafts, completionRate: rep.completionRate, last7: rep.last7, openTeams, activeCodes }, todos });
+      }
       if (p === '/api/admin/codes' && method === 'GET') {
         const page = Math.max(1, Number(url.searchParams.get('page')) || 1);
         const size = 50;
